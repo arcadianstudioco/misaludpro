@@ -22,7 +22,11 @@ void main() async {
   );
 
   final controller = HealthController();
-  await controller.load();
+  try {
+    await controller.load();
+  } catch (e) {
+    debugPrint('Error loading controller: $e');
+  }
 
   runApp(MiSaludProApp(controller: controller));
 }

@@ -179,6 +179,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   height: 240,
                   width: double.infinity,
                   fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 240,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.fitness_center,
+                            size: 64, color: AppColors.lime),
+                      ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 20),
