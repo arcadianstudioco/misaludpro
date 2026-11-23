@@ -15,7 +15,8 @@ class ProfileScreen extends StatelessWidget {
       children: [
         const Text(
           'Perfil',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+          style: TextStyle(
+              fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
         ),
         const SizedBox(height: 12),
         // ── Profile Card ───────────────────────────────────────────────────
@@ -29,7 +30,8 @@ class ProfileScreen extends StatelessWidget {
                   children: [
                     const CircleAvatar(
                       radius: 30,
-                      backgroundImage: AssetImage('assets/images/user_profile_avatar.jpg'),
+                      backgroundImage:
+                          AssetImage('assets/images/user_profile_avatar.jpg'),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -40,25 +42,27 @@ class ProfileScreen extends StatelessWidget {
                               style: const TextStyle(
                                   fontSize: 18, fontWeight: FontWeight.bold)),
                           Text(p.email,
-                              style: const TextStyle(color: AppColors.textSecondary)),
+                              style: const TextStyle(
+                                  color: AppColors.textSecondary)),
                         ],
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                Text('Edad: ${p.age} años · Estatura: ${p.heightCm.toStringAsFixed(0)} cm'),
+                Text(
+                    'Edad: ${p.age} años · Estatura: ${p.heightCm.toStringAsFixed(0)} cm'),
                 Text('Objetivo: ${p.goal}'),
                 Text('Nivel: ${p.level}'),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _ProfileStat(
-                        label: 'IMC', value: p.bmi.toStringAsFixed(1)),
+                    _ProfileStat(label: 'IMC', value: p.bmi.toStringAsFixed(1)),
                     const SizedBox(width: 16),
                     _ProfileStat(
                         label: 'Grasa est.',
-                        value: '${controller.bodyFatPercent.toStringAsFixed(1)}%'),
+                        value:
+                            '${controller.bodyFatPercent.toStringAsFixed(1)}%'),
                     const SizedBox(width: 16),
                     _ProfileStat(
                         label: 'Peso obj.',
@@ -80,14 +84,15 @@ class ProfileScreen extends StatelessWidget {
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.storage_rounded, color: AppColors.lime, size: 18),
+                    Icon(Icons.storage_rounded,
+                        color: AppColors.lime, size: 18),
                     SizedBox(width: 8),
                     Text('Persistencia local y nube',
                         style: TextStyle(fontWeight: FontWeight.bold)),
                   ],
                 ),
                 const SizedBox(height: 10),
-                _SyncRow(
+                const _SyncRow(
                     icon: Icons.phone_android_rounded,
                     label: 'Almacenamiento local',
                     value: 'SharedPreferences activo'),
@@ -169,10 +174,12 @@ class ProfileScreen extends StatelessWidget {
                 const Text('Objetivos nutricionales',
                     style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
-                _TargetRow(label: 'Calorías',
+                _TargetRow(
+                    label: 'Calorías',
                     value: '${p.calorieTargetMin}–${p.calorieTargetMax} kcal'),
                 _TargetRow(label: 'Proteínas', value: '${p.proteinTargetG} g'),
-                _TargetRow(label: 'Carbohidratos', value: '${p.carbsTargetG} g'),
+                _TargetRow(
+                    label: 'Carbohidratos', value: '${p.carbsTargetG} g'),
                 _TargetRow(label: 'Grasas', value: '${p.fatTargetG} g'),
                 _TargetRow(label: 'Agua', value: '${p.waterTargetLiters} L'),
               ],
@@ -186,7 +193,8 @@ class ProfileScreen extends StatelessWidget {
           child: Column(
             children: [
               ListTile(
-                leading: const Icon(Icons.download_rounded, color: AppColors.lime),
+                leading:
+                    const Icon(Icons.download_rounded, color: AppColors.lime),
                 title: const Text('Exportar datos (JSON)'),
                 onTap: () {
                   final json = controller.exportJson();
@@ -222,8 +230,8 @@ class ProfileScreen extends StatelessWidget {
                     builder: (_) => AlertDialog(
                       backgroundColor: AppColors.surface,
                       title: const Text('¿Eliminar cuenta?'),
-                      content: const Text(
-                          'Se eliminarán todos tus datos locales.'),
+                      content:
+                          const Text('Se eliminarán todos tus datos locales.'),
                       actions: [
                         TextButton(
                             onPressed: () => Navigator.pop(context, false),
@@ -231,8 +239,8 @@ class ProfileScreen extends StatelessWidget {
                         TextButton(
                             onPressed: () => Navigator.pop(context, true),
                             child: const Text('Eliminar',
-                                style: TextStyle(
-                                    color: AppColors.negativeCoral))),
+                                style:
+                                    TextStyle(color: AppColors.negativeCoral))),
                       ],
                     ),
                   );
@@ -275,8 +283,8 @@ class _ProfileStat extends StatelessWidget {
             style: const TextStyle(
                 fontWeight: FontWeight.bold, color: AppColors.lime)),
         Text(label,
-            style: const TextStyle(
-                fontSize: 11, color: AppColors.textSecondary)),
+            style:
+                const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
       ],
     );
   }
@@ -299,11 +307,11 @@ class _SyncRow extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
               child: Text(label,
-                  style:
-                      const TextStyle(color: AppColors.textSecondary, fontSize: 13))),
+                  style: const TextStyle(
+                      color: AppColors.textSecondary, fontSize: 13))),
           Text(value,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w600, fontSize: 13)),
+              style:
+                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
         ],
       ),
     );
@@ -322,8 +330,7 @@ class _TargetRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: const TextStyle(color: AppColors.textSecondary)),
+          Text(label, style: const TextStyle(color: AppColors.textSecondary)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),

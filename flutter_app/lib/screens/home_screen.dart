@@ -70,7 +70,8 @@ class HomeScreen extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.wifi_off_rounded, color: Colors.amber, size: 16),
+                const Icon(Icons.wifi_off_rounded,
+                    color: Colors.amber, size: 16),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -83,7 +84,8 @@ class HomeScreen extends StatelessWidget {
                 if (controller.pendingChanges > 0)
                   Container(
                     margin: const EdgeInsets.only(left: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.amber.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(99),
@@ -116,7 +118,8 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 4),
                 const Text(
                   'Tu constancia hace la diferencia',
-                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  style:
+                      TextStyle(fontSize: 13, color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 20),
                 SizedBox(
@@ -293,8 +296,7 @@ class HomeScreen extends StatelessWidget {
                         : Icons.check_box_outline_blank,
                     color: AppColors.lime,
                   ),
-                  title:
-                      Text('Dormir 7-9 h (${controller.sleepHours} h)'),
+                  title: Text('Dormir 7-9 h (${controller.sleepHours} h)'),
                   trailing: const Icon(Icons.chevron_right),
                 ),
               ],
@@ -358,8 +360,7 @@ class HomeScreen extends StatelessWidget {
         Card(
           child: ListTile(
             onTap: onOpenHealth,
-            leading:
-                const Icon(Icons.favorite_rounded, color: AppColors.lime),
+            leading: const Icon(Icons.favorite_rounded, color: AppColors.lime),
             title: const Text('Salud y Suelo Pélvico'),
             subtitle: const Text('Hidratación, sueño y guía Kegel'),
             trailing: const Icon(Icons.chevron_right),
@@ -450,7 +451,7 @@ class _SyncPill extends StatelessWidget {
             const Text('Estado de sincronización',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            _InfoRow(
+            const _InfoRow(
                 icon: Icons.storage_rounded,
                 label: 'Datos locales',
                 value: 'SharedPreferences activo'),
@@ -513,7 +514,8 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  const _InfoRow({required this.icon, required this.label, required this.value});
+  const _InfoRow(
+      {required this.icon, required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -526,8 +528,7 @@ class _InfoRow extends StatelessWidget {
           Expanded(
               child: Text(label,
                   style: const TextStyle(color: AppColors.textSecondary))),
-          Text(value,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -556,9 +557,7 @@ class _StreakBadge extends StatelessWidget {
                 ? AppColors.lime.withOpacity(0.15)
                 : Colors.white.withOpacity(0.05),
             border: Border.all(
-              color: active
-                  ? AppColors.lime.withOpacity(0.5)
-                  : Colors.white12,
+              color: active ? AppColors.lime.withOpacity(0.5) : Colors.white12,
             ),
           ),
           child: Center(
@@ -576,8 +575,8 @@ class _StreakBadge extends StatelessWidget {
           ),
         ),
         Text(label,
-            style: const TextStyle(
-                fontSize: 10, color: AppColors.textSecondary)),
+            style:
+                const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
       ],
     );
   }

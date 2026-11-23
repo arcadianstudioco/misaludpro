@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -41,7 +42,9 @@ class MiSaludProWebView extends StatefulWidget {
 
 class _MiSaludProWebViewState extends State<MiSaludProWebView> {
   late final WebViewController _controller;
+  HttpServer? _localServer;
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -54,21 +57,86 @@ class _MiSaludProWebViewState extends State<MiSaludProWebView> {
           onPageFinished: (_) {
             if (mounted) setState(() => _isLoading = false);
           },
-          onWebResourceError: (_) {
-            _controller.loadFlutterAsset('assets/dist/index.html');
+          onWebResourceError: (error) {
+            debugPrint('WebResourceError: ${error.description}');
           },
         ),
       );
 
-    _initAppContent();
+    _startServerAndLoad();
   }
 
-  Future<void> _initAppContent() async {
-    try {
-      await _controller.loadFlutterAsset('assets/dist/index.html');
-    } catch (_) {
-      await _controller.loadRequest(Uri.parse('http://10.0.2.2:3000'));
+  ContentType _getContentType(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.html')) return ContentType.html;
+    if (lower.endsWith('.js') || lower.endsWith('.mjs')) {
+      return ContentType('application', 'javascript', charset: 'utf-8');
     }
+    if (lower.endsWith('.css')) {
+      return ContentType('text', 'css', charset: 'utf-8');
+    }
+    if (lower.endsWith('.png')) return ContentType('image', 'png');
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+      return ContentType('image', 'jpeg');
+    }
+    if (lower.endsWith('.svg')) return ContentType('image', 'svg+xml');
+    if (lower.endsWith('.json')) return ContentType.json;
+    if (lower.endsWith('.woff2')) return ContentType('font', 'woff2');
+    if (lower.endsWith('.woff')) return ContentType('font', 'woff');
+    if (lower.endsWith('.ttf')) return ContentType('font', 'ttf');
+    return ContentType.binary;
+  }
+
+  Future<void> _startServerAndLoad() async {
+    try {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      _localServer = server;
+
+      server.listen((HttpRequest request) async {
+        String reqPath = request.uri.path;
+        if (reqPath == '/' || reqPath.isEmpty) {
+          reqPath = '/index.html';
+        }
+
+        final assetPath = 'assets/dist$reqPath';
+        try {
+          final data = await rootBundle.load(assetPath);
+          final bytes = data.buffer.asUint8List();
+          request.response.headers.contentType = _getContentType(reqPath);
+          request.response.headers.add('Access-Control-Allow-Origin', '*');
+          request.response.add(bytes);
+        } catch (_) {
+          // SPA fallback: return index.html for client-side routing
+          try {
+            final data = await rootBundle.load('assets/dist/index.html');
+            request.response.headers.contentType = ContentType.html;
+            request.response.headers.add('Access-Control-Allow-Origin', '*');
+            request.response.add(data.buffer.asUint8List());
+          } catch (e) {
+            request.response.statusCode = HttpStatus.notFound;
+          }
+        }
+        await request.response.close();
+      });
+
+      final url = 'http://127.0.0.1:${server.port}';
+      debugPrint('Local server running at $url');
+      await _controller.loadRequest(Uri.parse(url));
+    } catch (e) {
+      debugPrint('Error starting local server: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Error al cargar la aplicación: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _localServer?.close(force: true);
+    super.dispose();
   }
 
   @override
@@ -86,8 +154,20 @@ class _MiSaludProWebViewState extends State<MiSaludProWebView> {
         body: SafeArea(
           child: Stack(
             children: [
-              WebViewWidget(controller: _controller),
-              if (_isLoading)
+              if (_errorMessage == null)
+                WebViewWidget(controller: _controller)
+              else
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.white70),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              if (_isLoading && _errorMessage == null)
                 const Center(
                   child: CircularProgressIndicator(
                     color: Color(0xFF74D834),

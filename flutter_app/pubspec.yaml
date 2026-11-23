@@ -29,3 +29,5 @@ flutter:
     - assets/images/
     - assets/dist/
     - assets/dist/assets/
+    - assets/dist/assets/aistudio/
+    - assets/dist/src/assets/images/
