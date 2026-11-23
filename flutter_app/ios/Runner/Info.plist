@@ -51,6 +51,13 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Mi Salud Pro usa tu ubicación GPS para trazar tu ruta, distancia y ritmo al correr o caminar al aire libre.</string>
 	<key>NSCameraUsageDescription</key>
