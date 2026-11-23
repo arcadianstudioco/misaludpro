@@ -1,0 +1,62 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build Unsigned iOS IPA
+    runs-on: macos-14
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Copy Web Bundle into Flutter Assets
+        run: |
+          rm -rf flutter_app/assets/dist
+          cp -R dist flutter_app/assets/dist
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: |
+          cd flutter_app
+          flutter pub get
+
+      - name: Build iOS App (No Codesign)
+        run: |
+          cd flutter_app
+          flutter build ios --no-codesign --release
+
+      - name: Package Unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -R flutter_app/build/ios/iphoneos/Runner.app Payload/
+          zip -r -q misaludpro-unsigned.ipa Payload
+          rm -rf Payload
+
+      - name: Upload Unsigned IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: misaludpro-ios-ipa
+          path: misaludpro-unsigned.ipa
+          retention-days: 7

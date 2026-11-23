@@ -1,0 +1,211 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --bg-canvas: #0a0d0b;
+    --bg-surface: #131a16;
+    --bg-surface-elevated: #18211c;
+    --border-subtle: rgba(255, 255, 255, 0.07);
+    --accent-lime: #74d834;
+    --accent-emerald: #48b824;
+    --ring-track: #212b24;
+    --chart-grid: rgba(255, 255, 255, 0.06);
+    --chart-cursor: rgba(255, 255, 255, 0.16);
+  }
+
+  html.light {
+    --bg-canvas: #f3f6f3;
+    --bg-surface: #ffffff;
+    --bg-surface-elevated: #edf2ee;
+    --border-subtle: rgba(17, 26, 20, 0.09);
+    --accent-lime: #5bc21e;
+    --accent-emerald: #3c960d;
+    --ring-track: #dce5de;
+    --chart-grid: rgba(17, 26, 20, 0.08);
+    --chart-cursor: rgba(17, 26, 20, 0.22);
+  }
+
+  html {
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--bg-canvas);
+    color: #f4f7f4;
+    transition: background-color 220ms ease, color 220ms ease;
+  }
+
+  html.light {
+    background-color: #f3f6f3;
+    color: #111a14;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  .font-mono-nums {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0d0b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #222d26;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #314237;
+}
+
+html.light ::-webkit-scrollbar-track {
+  background: #eef2ee;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #c5d1c8;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #9eb0a3;
+}
+
+/* ==========================================================================
+   Cohesive Light Theme Surface & Ink Overrides (excludes .keep-dark containers)
+   ========================================================================== */
+html.light body {
+  background-color: #f3f6f3;
+  color: #111a14;
+}
+
+/* Outer frame & app canvases */
+html.light .bg-\[\#060807\]:not(.keep-dark):not(.keep-dark *) {
+  background-color: #e2e9e3;
+}
+
+html.light .bg-\[\#0A0D0B\]:not(.keep-dark):not(.keep-dark *) {
+  background-color: #f3f6f3;
+}
+
+html.light .bg-\[\#0D130F\]\/95:not(.keep-dark):not(.keep-dark *) {
+  background-color: rgba(255, 255, 255, 0.94);
+}
+
+/* Cards, modals & hero gradients */
+html.light .bg-\[\#131A16\]:not(.keep-dark):not(.keep-dark *),
+html.light .bg-\[\#111713\]:not(.keep-dark):not(.keep-dark *),
+html.light .bg-\[\#141C17\]:not(.keep-dark):not(.keep-dark *),
+html.light .bg-\[\#151E19\]:not(.keep-dark):not(.keep-dark *),
+html.light .bg-\[\#16231A\]:not(.keep-dark):not(.keep-dark *),
+html.light .bg-\[\#17241B\]:not(.keep-dark):not(.keep-dark *) {
+  background-color: #ffffff;
+  box-shadow: 0 2px 10px rgba(17, 26, 20, 0.04);
+}
+
+html.light .bg-\[\#132220\]:not(.keep-dark):not(.keep-dark *) {
+  background-color: #effaf7;
+}
+
+html.light .bg-\[\#0B100D\]\/95:not(.keep-dark):not(.keep-dark *) {
+  background-color: rgba(255, 255, 255, 0.97);
+}
+
+html.light .from-\[\#17211B\].to-\[\#111713\]:not(.keep-dark):not(.keep-dark *),
+html.light .from-\[\#151E19\].to-\[\#111713\]:not(.keep-dark):not(.keep-dark *) {
+  --tw-gradient-from: #ffffff;
+  --tw-gradient-to: #f7faf7;
+  background-image: linear-gradient(to bottom, #ffffff, #f6faf6);
+  box-shadow: 0 4px 16px rgba(17, 26, 20, 0.05);
+}
+
+/* Nested wells & inputs */
+html.light .bg-\[\#0D120F\]:not(.keep-dark):not(.keep-dark *),
+html.light .bg-\[\#0C110E\]:not(.keep-dark):not(.keep-dark *) {
+  background-color: #edf2ee;
+}
+
+/* Elevated secondary pills & progress tracks */
+html.light .bg-\[\#1A231D\]:not(.keep-dark):not(.keep-dark *),
+html.light .bg-\[\#1A241E\]:not(.keep-dark):not(.keep-dark *),
+html.light .bg-\[\#1B241E\]:not(.keep-dark):not(.keep-dark *),
+html.light .bg-\[\#1D2821\]:not(.keep-dark):not(.keep-dark *),
+html.light .bg-\[\#1E2721\]:not(.keep-dark):not(.keep-dark *),
+html.light .bg-\[\#1C2620\]:not(.keep-dark):not(.keep-dark *),
+html.light .bg-\[\#253028\]:not(.keep-dark):not(.keep-dark *) {
+  background-color: #e2ebe4;
+}
+
+html.light .bg-white\/5:not(.keep-dark):not(.keep-dark *),
+html.light .bg-white\/\[0\.04\]:not(.keep-dark):not(.keep-dark *) {
+  background-color: rgba(17, 26, 20, 0.06);
+}
+
+/* Borders & dividers */
+html.light .border-\[\#1F2922\]:not(.keep-dark):not(.keep-dark *) {
+  border-color: #cfd8d1;
+}
+
+html.light .border-white\/6:not(.keep-dark):not(.keep-dark *),
+html.light .border-white\/7:not(.keep-dark):not(.keep-dark *),
+html.light .border-white\/8:not(.keep-dark):not(.keep-dark *),
+html.light .border-white\/10:not(.keep-dark):not(.keep-dark *),
+html.light .border-white\/15:not(.keep-dark):not(.keep-dark *) {
+  border-color: rgba(17, 26, 20, 0.1);
+}
+
+html.light .divide-white\/6:not(.keep-dark):not(.keep-dark *) > :not(:last-child) {
+  border-color: rgba(17, 26, 20, 0.08);
+}
+
+/* Primary & secondary ink */
+html.light .text-white:not(.keep-dark):not(.keep-dark *):not(.bg-\[\#E06A5E\]):not(.bg-\[\#0A95FF\]),
+html.light .text-\[\#F4F7F4\]:not(.keep-dark):not(.keep-dark *),
+html.light .text-\[\#EDF2ED\]:not(.keep-dark):not(.keep-dark *),
+html.light .text-\[\#E5ECE6\]:not(.keep-dark):not(.keep-dark *),
+html.light .text-\[\#E2EAE3\]:not(.keep-dark):not(.keep-dark *),
+html.light .text-\[\#DCE6DD\]:not(.keep-dark):not(.keep-dark *) {
+  color: #111a14;
+}
+
+html.light .text-\[\#D2DDD5\]:not(.keep-dark):not(.keep-dark *),
+html.light .text-\[\#C5D0C8\]:not(.keep-dark):not(.keep-dark *),
+html.light .text-\[\#B8C4BC\]:not(.keep-dark):not(.keep-dark *),
+html.light .text-\[\#B7C4BB\]:not(.keep-dark):not(.keep-dark *) {
+  color: #344639;
+}
+
+html.light .text-\[\#9AA89E\]:not(.keep-dark):not(.keep-dark *),
+html.light .text-\[\#8E9D93\]:not(.keep-dark):not(.keep-dark *),
+html.light .text-\[\#87978C\]:not(.keep-dark):not(.keep-dark *),
+html.light .text-\[\#849489\]:not(.keep-dark):not(.keep-dark *),
+html.light .text-\[\#7D8C82\]:not(.keep-dark):not(.keep-dark *),
+html.light .text-\[\#6E7D73\]:not(.keep-dark):not(.keep-dark *) {
+  color: #5b6d60;
+}
+
+/* Readable brand lime text/icons on light backgrounds */
+html.light .text-\[\#74D834\]:not(.keep-dark):not(.keep-dark *) {
+  color: #3a920c;
+}
+
+html.light .hover\:text-white:hover:not(.keep-dark):not(.keep-dark *) {
+  color: #111a14;
+}
+
+/* Welcome hero light gradient compatibility */
+html.light .welcome-hero-fade {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.12), rgba(243, 246, 243, 0.25), #f3f6f3);
+}
