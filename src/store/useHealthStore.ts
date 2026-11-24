@@ -41,6 +41,7 @@ import {
 } from '../services/authClient';
 import {
   isSupabaseConfigured,
+  supabaseGetCurrentUser,
   supabaseSignUp,
   supabaseSignIn,
   supabaseSignOut,

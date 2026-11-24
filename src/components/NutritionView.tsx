@@ -50,9 +50,9 @@ const MEAL_SLOTS: MealSlot[] = ['Desayuno', 'Almuerzo', 'Cena', 'Snack'];
 
 export function NutritionView({
   profile,
-  todayMeals,
-  totals,
-  shoppingList,
+  todayMeals: rawTodayMeals,
+  totals: rawTotals,
+  shoppingList: rawShoppingList,
   onAddMeal,
   onToggleMeal,
   onDeleteMeal,
@@ -60,6 +60,20 @@ export function NutritionView({
   onAddShoppingItem,
   onExportPdf,
 }: NutritionViewProps) {
+  const todayMeals = Array.isArray(rawTodayMeals) ? rawTodayMeals : [];
+  const shoppingList = Array.isArray(rawShoppingList) ? rawShoppingList : [];
+  const totals = {
+    calories: Number(rawTotals?.calories) || 0,
+    proteinG: Number(rawTotals?.proteinG) || 0,
+    carbsG: Number(rawTotals?.carbsG) || 0,
+    fatG: Number(rawTotals?.fatG) || 0,
+  };
+  const calorieTargetMin = Number(profile?.calorieTargetMin) || 1700;
+  const calorieTargetMax = Number(profile?.calorieTargetMax) || 2100;
+  const proteinTargetG = Number(profile?.proteinTargetG) || 140;
+  const carbsTargetG = Number(profile?.carbsTargetG) || 190;
+  const fatTargetG = Number(profile?.fatTargetG) || 65;
+
   const [showAddMeal, setShowAddMeal] = useState(false);
   const [showShopping, setShowShopping] = useState(false);
 
@@ -85,16 +99,16 @@ export function NutritionView({
   const [newShopQty, setNewShopQty] = useState('');
 
   const avgTarget = Math.round(
-    (profile.calorieTargetMin + profile.calorieTargetMax) / 2
+    (calorieTargetMin + calorieTargetMax) / 2
   );
   const caloriePercent = Math.min(
     100,
     Math.round((totals.calories / Math.max(800, avgTarget)) * 100)
   );
 
-  const proteinPct = Math.min(100, (totals.proteinG / Math.max(1, profile.proteinTargetG)) * 100);
-  const carbsPct = Math.min(100, (totals.carbsG / Math.max(1, profile.carbsTargetG)) * 100);
-  const fatPct = Math.min(100, (totals.fatG / Math.max(1, profile.fatTargetG)) * 100);
+  const proteinPct = Math.min(100, (totals.proteinG / Math.max(1, proteinTargetG)) * 100);
+  const carbsPct = Math.min(100, (totals.carbsG / Math.max(1, carbsTargetG)) * 100);
+  const fatPct = Math.min(100, (totals.fatG / Math.max(1, fatTargetG)) * 100);
 
   const numPro = Math.max(0, Number(calcPro) || 0);
   const numCarbs = Math.max(0, Number(calcCarbs) || 0);
@@ -227,8 +241,8 @@ export function NutritionView({
               <span className="text-[#74D834] font-semibold tabular-nums">{remainingKcal.toLocaleString('es-ES')}</span>
             </p>
             <p className="font-display text-sm font-bold text-white mt-0.5 tabular-nums">
-              Meta: {profile.calorieTargetMin.toLocaleString('es-ES')} –{' '}
-              {profile.calorieTargetMax.toLocaleString('es-ES')} kcal
+              Meta: {calorieTargetMin.toLocaleString('es-ES')} –{' '}
+              {calorieTargetMax.toLocaleString('es-ES')} kcal
             </p>
           </div>
           <ProgressRing percent={caloriePercent} size={78} strokeWidth={7} />
@@ -241,7 +255,7 @@ export function NutritionView({
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium text-white">Proteínas</span>
             <span className="font-mono-nums text-[#C5D0C8]">
-              {totals.proteinG} / {profile.proteinTargetG} g
+              {totals.proteinG} / {proteinTargetG} g
             </span>
           </div>
           <div className="h-2 rounded-full bg-[#1E2721] overflow-hidden">
@@ -256,7 +270,7 @@ export function NutritionView({
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium text-white">Carbohidratos</span>
             <span className="font-mono-nums text-[#C5D0C8]">
-              {totals.carbsG} / {profile.carbsTargetG} g
+              {totals.carbsG} / {carbsTargetG} g
             </span>
           </div>
           <div className="h-2 rounded-full bg-[#1E2721] overflow-hidden">
@@ -271,7 +285,7 @@ export function NutritionView({
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium text-white">Grasas</span>
             <span className="font-mono-nums text-[#C5D0C8]">
-              {totals.fatG} / {profile.fatTargetG} g
+              {totals.fatG} / {fatTargetG} g
             </span>
           </div>
           <div className="h-2 rounded-full bg-[#1E2721] overflow-hidden">

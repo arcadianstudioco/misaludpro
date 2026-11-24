@@ -88,9 +88,21 @@ class _MiSaludProWebViewState extends State<MiSaludProWebView> {
     return ContentType.binary;
   }
 
+  Future<HttpServer> _bindFixedPortServer() async {
+    const preferredPorts = [48123, 48124, 48125];
+    for (final port in preferredPorts) {
+      try {
+        return await HttpServer.bind(InternetAddress.loopbackIPv4, port);
+      } catch (_) {
+        // Port busy, try next
+      }
+    }
+    return HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  }
+
   Future<void> _startServerAndLoad() async {
     try {
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final server = await _bindFixedPortServer();
       _localServer = server;
 
       server.listen((HttpRequest request) async {

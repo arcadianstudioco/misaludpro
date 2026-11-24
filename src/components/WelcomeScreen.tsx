@@ -487,7 +487,7 @@ export function WelcomeScreen({
       {mode === 'login' && (
         <form
           onSubmit={(e) => void handleLoginSubmit(e)}
-          className="px-5 py-4 space-y-4 flex-1 flex flex-col"
+          className="px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))] space-y-4 flex-1 flex flex-col"
         >
           <button
             type="button"
@@ -629,7 +629,7 @@ export function WelcomeScreen({
       {mode === 'onboarding' && (
         <form
           onSubmit={(e) => void handleOnboardingSubmit(e)}
-          className="px-5 py-4 space-y-3.5 flex-1 flex flex-col"
+          className="px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))] space-y-3.5 flex-1 flex flex-col"
         >
           <div className="flex items-center justify-between">
             <button
