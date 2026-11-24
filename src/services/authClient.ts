@@ -2,7 +2,7 @@ import { AppState } from '../types/health';
 import { isAppOnline } from './localPersistence';
 import { syncAppStateToSupabase, isSupabaseConfigured } from './supabaseClient';
 
-export type AuthProvider = 'password' | 'google' | 'apple';
+export type AuthProvider = 'password' | 'google' | 'apple' | 'supabase';
 
 export interface AuthUser {
   id: string;
@@ -154,7 +154,7 @@ export async function registerWithPassword(input: {
   rememberMe: boolean;
   acceptedTerms: boolean;
   appState: AppState;
-}): Promise<{ ok: true; data: AuthResponsePayload } | { ok: false; error: string }> {
+}): Promise<{ ok: true; data: AuthResponsePayload } | { ok: false; error: string; backendUnavailable?: boolean }> {
   try {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
@@ -162,6 +162,10 @@ export async function registerWithPassword(input: {
       headers: buildAuthHeaders(true),
       body: JSON.stringify(input),
     });
+    const contentType = res.headers.get('content-type') || '';
+    if (res.status === 404 || !contentType.includes('application/json')) {
+      return { ok: false, error: 'Servidor local no disponible.', backendUnavailable: true };
+    }
     const data = await parseJsonSafe<AuthResponsePayload>(res);
     if (!res.ok || !data.token || !data.user) {
       return { ok: false, error: data.error || 'No se pudo crear la cuenta.' };
@@ -173,7 +177,7 @@ export async function registerWithPassword(input: {
     }
     return { ok: true, data };
   } catch {
-    return { ok: false, error: 'Error de conexión con el servidor.' };
+    return { ok: false, error: 'Error de conexión con el servidor.', backendUnavailable: true };
   }
 }
 
@@ -181,7 +185,7 @@ export async function loginWithPassword(input: {
   email: string;
   password: string;
   rememberMe: boolean;
-}): Promise<{ ok: true; data: AuthResponsePayload } | { ok: false; error: string }> {
+}): Promise<{ ok: true; data: AuthResponsePayload } | { ok: false; error: string; backendUnavailable?: boolean }> {
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
@@ -189,6 +193,10 @@ export async function loginWithPassword(input: {
       headers: buildAuthHeaders(true),
       body: JSON.stringify(input),
     });
+    const contentType = res.headers.get('content-type') || '';
+    if (res.status === 404 || !contentType.includes('application/json')) {
+      return { ok: false, error: 'Servidor local no disponible.', backendUnavailable: true };
+    }
     const data = await parseJsonSafe<AuthResponsePayload>(res);
     if (!res.ok || !data.token || !data.user) {
       return { ok: false, error: data.error || 'Correo o contraseña incorrectos.' };
@@ -200,7 +208,7 @@ export async function loginWithPassword(input: {
     }
     return { ok: true, data };
   } catch {
-    return { ok: false, error: 'No se pudo conectar con el servidor de acceso.' };
+    return { ok: false, error: 'No se pudo conectar con el servidor de acceso.', backendUnavailable: true };
   }
 }
 

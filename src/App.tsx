@@ -390,14 +390,20 @@ export default function App() {
       )}
       {/* MOBILE NATIVE-STYLE FULLSCREEN (< lg) */}
       <div className="lg:hidden min-h-screen bg-[#0A0D0B] flex flex-col">
-        <main className={`flex-1 px-4 pt-3 ${isAuthenticated ? 'pb-20' : 'pb-4'}`}>
+        <main
+          className={`flex-1 ${
+            isAuthenticated
+              ? 'px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]'
+              : 'p-0 pb-[env(safe-area-inset-bottom,16px)]'
+          }`}
+        >
           {renderMobileScreenContent()}
         </main>
 
         {isAuthenticated && (
           <nav
             aria-label="Barra inferior móvil"
-            className="fixed bottom-0 left-0 right-0 z-40 bg-[#0D130F]/95 backdrop-blur-md border-t border-white/8"
+            className="fixed bottom-0 left-0 right-0 z-40 bg-[#0D130F]/95 backdrop-blur-md border-t border-white/8 pb-[env(safe-area-inset-bottom,0px)]"
           >
             <div className="grid grid-cols-5 items-center h-16 px-1">
               {NAV_ITEMS.map((item) => {

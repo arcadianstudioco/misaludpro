@@ -52,23 +52,38 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Custom subtle scrollbar */
+/* ==========================================================================
+   Native Mobile App Feel (iOS / Android) - Eliminates all web-like behaviors
+   ========================================================================== */
+html,
+body,
+#root {
+  overscroll-behavior: none !important;
+  overscroll-behavior-y: none !important;
+  -webkit-overflow-scrolling: touch;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  touch-action: manipulation;
+}
+
+input,
+textarea {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+/* Hide all browser scrollbars for 100% clean native feel */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
-::-webkit-scrollbar-track {
-  background: #0a0d0b;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #222d26;
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #314237;
+* {
+  -webkit-tap-highlight-color: transparent !important;
+  scrollbar-width: none !important;
 }
 
 html.light ::-webkit-scrollbar-track {

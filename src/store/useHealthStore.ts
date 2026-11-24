@@ -26,6 +26,8 @@ import {
   WorkoutSessionLog,
 } from '../types/health';
 import {
+  AuthProvider,
+  AuthResponsePayload,
   AuthUser,
   changePasswordOnServer,
   deleteAccountOnServer,
@@ -33,6 +35,7 @@ import {
   loginWithPassword,
   logoutFromServer,
   registerWithPassword,
+  saveLoginEmailPreference,
   setInMemoryBearerToken,
   syncStateToServer,
 } from '../services/authClient';
@@ -551,6 +554,8 @@ export function useHealthStore() {
         freshState.profile.id = supabaseUserId;
       }
 
+      // 3b. Try to register with backend server (web) — skip gracefully in mobile standalone mode
+      let serverUser: AuthUser | null = null;
       const result = await registerWithPassword({
         name: input.name,
         email: input.email,
@@ -559,21 +564,36 @@ export function useHealthStore() {
         acceptedTerms: input.acceptedTerms,
         appState: freshState,
       });
-
-      if (!result.ok) {
+      if (result.ok) {
+        serverUser = result.data.user;
+      } else if (!result.backendUnavailable) {
         return { ok: false, error: result.error };
       }
 
+      if (!serverUser) {
+        saveLoginEmailPreference(input.email, input.rememberMe);
+      }
+
+      // 4. Build the auth user (from server if available, else from Supabase)
+      const authUsr: AuthUser = serverUser ?? {
+        id: supabaseUserId || input.email,
+        email: input.email,
+        name: input.name,
+        provider: 'supabase' as AuthProvider,
+        acceptedTermsAt: new Date().toISOString(),
+      };
+
       skipNextSyncRef.current = true;
-      setAuthUser(result.data.user);
-      const finalState = result.data.appState ? { ...result.data.appState, isAuthenticated: true } : freshState;
+      setAuthUser(authUsr);
+      const finalState: AppState = { ...freshState, isAuthenticated: true };
       setState(finalState);
 
-      // 4. Save state locally and sync directly to this user's isolated row in Supabase
+      // 5. Save state locally and sync directly to this user's isolated row in Supabase
       await saveLocalState(finalState);
       if (isSupabaseConfigured()) {
         void syncAppStateToSupabase(finalState);
       }
+      await saveCachedAuthUser(authUsr);
 
       return { ok: true };
     },
@@ -597,16 +617,41 @@ export function useHealthStore() {
         }
       }
 
-      // 3. Authenticate with server
-      const result = await loginWithPassword({ email, password, rememberMe });
-      if (!result.ok) {
-        return { ok: false, error: result.error };
+      // 3. Authenticate with server (web mode) — in mobile standalone mode this may not be available
+      const serverLoginResult = await loginWithPassword({ email, password, rememberMe });
+
+      if (!serverLoginResult.ok && !serverLoginResult.backendUnavailable) {
+        // Server responded with a real auth error
+        return { ok: false, error: serverLoginResult.error };
+      }
+
+      // 4. Build auth user (from server if available, else from Supabase session)
+      let signedInUser: AuthUser | null = serverLoginResult.ok ? serverLoginResult.data.user : null;
+      if (!signedInUser && isSupabaseConfigured()) {
+        // Mobile mode: reconstruct AuthUser from Supabase session
+        const { supabaseGetCurrentUser } = await import('../services/supabaseClient');
+        const sbUser = await supabaseGetCurrentUser();
+        if (sbUser) {
+          saveLoginEmailPreference(email, rememberMe);
+          signedInUser = {
+            id: sbUser.id,
+            email: sbUser.email || email,
+            name: (sbUser.user_metadata?.name as string) || sbUser.email?.split('@')[0] || 'Usuario',
+            provider: 'supabase' as AuthProvider,
+            acceptedTermsAt: new Date().toISOString(),
+          };
+        }
+      }
+
+      if (!signedInUser) {
+        return { ok: false, error: 'No se pudo verificar la sesión. Intenta de nuevo.' };
       }
 
       skipNextSyncRef.current = true;
-      setAuthUser(result.data.user);
+      setAuthUser(signedInUser);
+      await saveCachedAuthUser(signedInUser);
 
-      // 4. Load the user's isolated state from Supabase (Row Level Security protected)
+      // 5. Load the user's isolated state from Supabase (Row Level Security protected)
       let remoteState: Partial<AppState> | null = null;
       if (isSupabaseConfigured()) {
         const fetched = await fetchAppStateFromSupabase();
@@ -618,8 +663,8 @@ export function useHealthStore() {
       if (remoteState && remoteState.profile) {
         const full: AppState = {
           ...createFreshUserState({
-            name: result.data.user.name,
-            email: result.data.user.email,
+            name: signedInUser.name,
+            email: signedInUser.email,
             age: 30,
             heightCm: 175,
             weightKg: 78,
@@ -634,13 +679,13 @@ export function useHealthStore() {
         };
         setState(full);
         await saveLocalState(full);
-      } else if (result.data.appState && result.data.appState.profile) {
-        setState({ ...result.data.appState, isAuthenticated: true });
-        await saveLocalState(result.data.appState);
+      } else if (serverLoginResult.ok && serverLoginResult.data.appState && serverLoginResult.data.appState.profile) {
+        setState({ ...serverLoginResult.data.appState, isAuthenticated: true });
+        await saveLocalState(serverLoginResult.data.appState);
       } else {
         const fresh = createFreshUserState({
-          name: result.data.user.name,
-          email: result.data.user.email,
+          name: signedInUser.name,
+          email: signedInUser.email,
           age: 30,
           heightCm: 175,
           weightKg: 78,
