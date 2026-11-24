@@ -436,27 +436,26 @@ export function useHealthStore() {
   }, [todayMeals]);
 
   const dailyGoalPercent = useMemo(() => {
-    if (!state) return 0;
-    const waterRatio = Math.min(
-      1,
-      todayHabits.waterLiters / Math.max(0.5, state.profile.waterTargetLiters)
-    );
-    const sleepRatio = Math.min(
-      1,
-      todayHabits.sleepHours / Math.max(4, state.profile.sleepTargetHours)
-    );
-    const calorieRatio = Math.min(
-      1,
-      nutritionTotals.calories / Math.max(800, state.profile.calorieTargetMin)
-    );
-    const workoutScore = todayHabits.workoutDone ? 1 : 0;
-    const eatingScore = todayHabits.healthyEatingDone ? 1 : calorieRatio * 0.8;
+    if (!state || !state.profile) return 0;
+    const waterTarget = Math.max(0.5, Number(state.profile.waterTargetLiters) || 3);
+    const sleepTarget = Math.max(4, Number(state.profile.sleepTargetHours) || 8);
+    const calorieTarget = Math.max(800, Number(state.profile.calorieTargetMin) || 1700);
+    const waterLiters = Math.max(0, Number(todayHabits?.waterLiters) || 0);
+    const sleepHours = Math.max(0, Number(todayHabits?.sleepHours) || 0);
+    const calories = Math.max(0, Number(nutritionTotals?.calories) || 0);
+
+    const waterRatio = Math.min(1, waterLiters / waterTarget);
+    const sleepRatio = Math.min(1, sleepHours / sleepTarget);
+    const calorieRatio = Math.min(1, calories / calorieTarget);
+    const workoutScore = todayHabits?.workoutDone ? 1 : 0;
+    const eatingScore = todayHabits?.healthyEatingDone ? 1 : calorieRatio * 0.8;
     const score =
       workoutScore * 0.35 +
       eatingScore * 0.25 +
       waterRatio * 0.2 +
       sleepRatio * 0.2;
-    return Math.min(100, Math.round(score * 100));
+    const pct = Math.min(100, Math.round(score * 100));
+    return Number.isFinite(pct) ? pct : 0;
   }, [state, todayHabits, nutritionTotals]);
 
   const habitStreaks: AllHabitStreaks = useMemo(() => {

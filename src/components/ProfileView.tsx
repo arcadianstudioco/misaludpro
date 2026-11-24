@@ -144,17 +144,65 @@ export function ProfileView({
     }
   };
 
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [cropZoom, setCropZoom] = useState(1);
+  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
+  const [cropImgSize, setCropImgSize] = useState<{ w: number; h: number } | null>(null);
+  const cropDragRef = React.useRef<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    origX: number;
+    origY: number;
+  }>({ active: false, startX: 0, startY: 0, origX: 0, origY: 0 });
+
   const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
       if (dataUrl) {
-        onUpdateProfile({ avatarUrl: dataUrl });
+        setCropZoom(1);
+        setCropOffset({ x: 0, y: 0 });
+        setCropImgSize(null);
+        setCropSrc(dataUrl);
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleConfirmAvatarCrop = () => {
+    if (!cropSrc || !cropImgSize) return;
+    const img = new Image();
+    img.onload = () => {
+      const outSize = 320;
+      const boxSize = 240;
+      const canvas = document.createElement('canvas');
+      canvas.width = outSize;
+      canvas.height = outSize;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const baseScale = Math.max(boxSize / cropImgSize.w, boxSize / cropImgSize.h);
+      const totalScale = baseScale * cropZoom;
+      const drawW = cropImgSize.w * totalScale;
+      const drawH = cropImgSize.h * totalScale;
+      const ratio = outSize / boxSize;
+
+      const dx = (boxSize / 2 + cropOffset.x - drawW / 2) * ratio;
+      const dy = (boxSize / 2 + cropOffset.y - drawH / 2) * ratio;
+
+      ctx.fillStyle = '#0A0D0B';
+      ctx.fillRect(0, 0, outSize, outSize);
+      ctx.drawImage(img, dx, dy, drawW * ratio, drawH * ratio);
+
+      const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      onUpdateProfile({ avatarUrl: croppedDataUrl });
+      setCropSrc(null);
+    };
+    img.src = cropSrc;
   };
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -1021,6 +1069,117 @@ export function ProfileView({
 
       {legalTab && (
         <LegalDocumentsModal initialTab={legalTab} onClose={() => setLegalTab(null)} />
+      )}
+
+      {cropSrc && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-3xl bg-[#131A16] border border-white/10 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-base font-bold text-white">
+                Recortar foto de perfil
+              </h3>
+              <button
+                type="button"
+                onClick={() => setCropSrc(null)}
+                className="text-xs text-[#9AA89E] hover:text-white px-2 py-1 cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+
+            <p className="text-[11px] text-[#9AA89E]">
+              Arrastra la imagen para encuadrarla y ajusta el zoom.
+            </p>
+
+            <div
+              className="relative mx-auto w-[240px] h-[240px] rounded-full overflow-hidden bg-[#0A0D0B] border-2 border-[#74D834]/70 select-none"
+              style={{ touchAction: 'none' }}
+              onPointerDown={(e) => {
+                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                cropDragRef.current = {
+                  active: true,
+                  startX: e.clientX,
+                  startY: e.clientY,
+                  origX: cropOffset.x,
+                  origY: cropOffset.y,
+                };
+              }}
+              onPointerMove={(e) => {
+                if (!cropDragRef.current.active) return;
+                const dx = e.clientX - cropDragRef.current.startX;
+                const dy = e.clientY - cropDragRef.current.startY;
+                setCropOffset({
+                  x: cropDragRef.current.origX + dx,
+                  y: cropDragRef.current.origY + dy,
+                });
+              }}
+              onPointerUp={() => {
+                cropDragRef.current.active = false;
+              }}
+              onPointerCancel={() => {
+                cropDragRef.current.active = false;
+              }}
+            >
+              <img
+                src={cropSrc}
+                alt="Vista previa de recorte"
+                draggable={false}
+                onLoad={(e) => {
+                  const img = e.currentTarget;
+                  setCropImgSize({ w: img.naturalWidth, h: img.naturalHeight });
+                }}
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  width: cropImgSize
+                    ? `${cropImgSize.w * Math.max(240 / cropImgSize.w, 240 / cropImgSize.h) * cropZoom}px`
+                    : '100%',
+                  height: cropImgSize
+                    ? `${cropImgSize.h * Math.max(240 / cropImgSize.w, 240 / cropImgSize.h) * cropZoom}px`
+                    : '100%',
+                  maxWidth: 'none',
+                  transform: `translate(calc(-50% + ${cropOffset.x}px), calc(-50% + ${cropOffset.y}px))`,
+                  pointerEvents: 'none',
+                }}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] text-[#B8C4BC]">
+                <span>Zoom</span>
+                <span className="tabular-nums">{cropZoom.toFixed(1)}x</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.05}
+                value={cropZoom}
+                onChange={(e) => setCropZoom(Number(e.target.value))}
+                className="w-full accent-[#74D834]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setCropSrc(null)}
+                className="min-h-[42px] rounded-xl bg-[#1B241E] text-xs font-semibold text-white cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAvatarCrop}
+                disabled={!cropImgSize}
+                className="min-h-[42px] rounded-xl bg-gradient-to-r from-[#82E63E] to-[#58C222] text-xs font-semibold text-[#081007] cursor-pointer disabled:opacity-50"
+              >
+                Guardar foto
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
