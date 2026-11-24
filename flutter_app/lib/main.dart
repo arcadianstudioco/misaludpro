@@ -53,13 +53,35 @@ class _MiSaludProWebViewState extends State<MiSaludProWebView> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFF0A0D0B))
+      ..addJavaScriptChannel(
+        'FlutterChannel',
+        onMessageReceived: (JavaScriptMessage msg) {
+          // React sends 'back' when user wants to close a full-screen overlay
+          if (msg.message == 'back') {
+            if (mounted) {
+              // Dispatch a custom DOM event that React listens to
+              _controller.runJavaScript(
+                "window.dispatchEvent(new CustomEvent('flutter-back'));",
+              );
+            }
+          }
+        },
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (_) {
             if (mounted) setState(() => _isLoading = false);
+            // Inject safe-area-inset-top via meta viewport so CSS env() works
+            // Also disable iOS back-swipe navigation inside the webview
+            _controller.runJavaScript('''
+              (function() {
+                // Prevent WKWebView history swipe from navigating away
+                document.addEventListener('touchstart', function(){}, {passive: true});
+              })();
+            ''');
           },
           onWebResourceError: (error) {
-            debugPrint('WebResourceError: ${error.description}');
+            debugPrint('WebResourceError: \${error.description}');
           },
         ),
       );

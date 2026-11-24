@@ -88,12 +88,14 @@ export function HealthHabitsView({
 
   return (
     <div className="space-y-4 pb-4">
-      <div className="flex items-center gap-3 pt-1">
+      {/* safe-area spacer so back button never hides under status bar */}
+      <div style={{ height: 'env(safe-area-inset-top, 0px)' }} />
+      <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={onBack}
           aria-label="Volver"
-          className="min-h-[40px] min-w-[40px] rounded-xl bg-[#131A16] border border-white/8 flex items-center justify-center text-[#B8C4BC] hover:text-white cursor-pointer"
+          className="min-h-[44px] min-w-[44px] rounded-xl bg-[#131A16] border border-white/8 flex items-center justify-center text-[#B8C4BC] hover:text-white cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>

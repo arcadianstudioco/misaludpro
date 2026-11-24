@@ -101,9 +101,44 @@ export default function App() {
     return () => window.removeEventListener('gmp-quota-exceeded', onQuota);
   }, []);
 
+  // Handle Flutter back-button / iOS swipe-back — close open sub-views
+  useEffect(() => {
+    const onFlutterBack = () => {
+      if (showHealthSubView) {
+        setShowHealthSubView(false);
+      } else if (activeReminderToast) {
+        setActiveReminderToast(null);
+      }
+    };
+    window.addEventListener('flutter-back', onFlutterBack);
+    return () => window.removeEventListener('flutter-back', onFlutterBack);
+  }, [showHealthSubView, activeReminderToast]);
+
   // Real-time reminder scheduler matching user's configured times
   useEffect(() => {
     if (!state || !state.isAuthenticated) return;
+
+    /** Play a short double-beep using Web Audio API */
+    const playReminderSound = () => {
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const beep = (startTime: number) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = 880;
+          gain.gain.setValueAtTime(0.6, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.18);
+          osc.start(startTime);
+          osc.stop(startTime + 0.18);
+        };
+        beep(ctx.currentTime);
+        beep(ctx.currentTime + 0.25);
+      } catch {
+        // Audio not available
+      }
+    };
 
     const checkReminders = () => {
       const now = new Date();
@@ -117,25 +152,25 @@ export default function App() {
           id: 'workout',
           enabled: r.workoutEnabled,
           time: r.workoutTime,
-          message: 'Hora de tu entrenamiento diario en Mi Salud Pro.',
+          message: '💪 Hora de tu entrenamiento diario en Mi Salud Pro.',
         },
         {
           id: 'meals',
           enabled: r.mealsEnabled,
           time: r.mealsTime,
-          message: 'Recuerda registrar tu comida y cumplir tus macros.',
+          message: '🥗 Recuerda registrar tu comida y cumplir tus macros.',
         },
         {
           id: 'kegel',
           enabled: r.kegelEnabled,
           time: r.kegelTime,
-          message: 'Momento de tu sesión guiada de suelo pélvico (Kegel).',
+          message: '🧘 Momento de tu sesión guiada de suelo pélvico (Kegel).',
         },
         {
           id: 'sleep',
           enabled: r.sleepEnabled,
           time: r.sleepTime,
-          message: 'Hora recomendada de descanso para recuperar energía (7–9 h).',
+          message: '🌙 Hora recomendada de descanso para recuperar energía (7–9 h).',
         },
       ];
 
@@ -144,19 +179,28 @@ export default function App() {
         if (item.enabled && item.time === currentHHMM && !firedRemindersRef.current.has(key)) {
           firedRemindersRef.current.add(key);
           setActiveReminderToast(item.message);
+          playReminderSound();
+          // Vibrate if supported (Android WebView)
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+          // Native system notification if permission granted
           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
             try {
-              new Notification('Mi Salud Pro', { body: item.message });
+              new Notification('Mi Salud Pro', {
+                body: item.message,
+                icon: '/icon-192.png',
+              });
             } catch {
               // Ignore restricted notification context
             }
           }
+          // Auto-dismiss banner after 12 seconds
+          window.setTimeout(() => setActiveReminderToast(null), 12000);
         }
       }
     };
 
     checkReminders();
-    const intervalId = window.setInterval(checkReminders, 20000);
+    const intervalId = window.setInterval(checkReminders, 10000);
     return () => window.clearInterval(intervalId);
   }, [state, today]);
 
@@ -216,15 +260,15 @@ export default function App() {
     return (
       <>
         {activeReminderToast && (
-          <div className="mb-3 rounded-2xl bg-[#16231A] border border-[#74D834]/40 px-3 py-2.5 flex items-center justify-between gap-2 text-xs text-white">
+          <div className="mb-3 rounded-2xl bg-[#16231A] border border-[#74D834]/60 px-3 py-3 flex items-center justify-between gap-2 text-xs text-white shadow-lg shadow-[#74D834]/10">
             <div className="flex items-center gap-2 min-w-0">
-              <Bell className="w-4 h-4 text-[#74D834] shrink-0" />
-              <span className="truncate">{activeReminderToast}</span>
+              <Bell className="w-4 h-4 text-[#74D834] shrink-0 animate-bounce" />
+              <span className="truncate font-medium">{activeReminderToast}</span>
             </div>
             <button
               type="button"
               onClick={() => setActiveReminderToast(null)}
-              className="text-[#9AA89E] hover:text-white cursor-pointer shrink-0"
+              className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-[#9AA89E] hover:text-white cursor-pointer shrink-0"
               aria-label="Cerrar aviso"
             >
               <X className="w-3.5 h-3.5" />
@@ -393,7 +437,7 @@ export default function App() {
         <main
           className={`flex-1 ${
             isAuthenticated
-              ? 'px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]'
+              ? 'px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]'
               : 'p-0 pb-[env(safe-area-inset-bottom,16px)]'
           }`}
         >

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronRight, Map as MapIcon, Share2, Smartphone, X } from 'lucide-react';
 import { WorkoutSessionLog } from '../types/health';
 import { RouteMapView } from './RouteMapView';
@@ -16,6 +16,13 @@ export function WorkoutSummaryAppleCard({
   const [mapStyle, setMapStyle] = useState<'dark' | 'satellite'>('dark');
   const [unit, setUnit] = useState<'MI' | 'KM'>('MI');
   const [sharedToast, setSharedToast] = useState(false);
+
+  // Listen for flutter-back (iOS back swipe / Android back button)
+  useEffect(() => {
+    const handler = () => onClose();
+    window.addEventListener('flutter-back', handler);
+    return () => window.removeEventListener('flutter-back', handler);
+  }, [onClose]);
 
   const miles = session.distanceMiles ?? 0;
   const km = miles * 1.609344;
@@ -68,8 +75,11 @@ export function WorkoutSummaryAppleCard({
           }}
         />
 
-        {/* Floating Apple-style circular buttons */}
-        <div className="absolute top-3 inset-x-4 flex items-center justify-between z-10">
+        {/* Floating Apple-style circular buttons – safe-area aware */}
+        <div
+          className="absolute inset-x-4 flex items-center justify-between z-10"
+          style={{ top: 'max(12px, env(safe-area-inset-top, 12px))' }}
+        >
           <button
             type="button"
             onClick={onClose}
@@ -100,7 +110,8 @@ export function WorkoutSummaryAppleCard({
         </div>
 
         {sharedToast && (
-          <div className="absolute top-15 right-4 px-3 py-1 rounded-full bg-[#9CE819] text-black text-[11px] font-semibold">
+          <div className="absolute right-4 px-3 py-1 rounded-full bg-[#9CE819] text-black text-[11px] font-semibold"
+            style={{ top: 'calc(max(12px, env(safe-area-inset-top, 12px)) + 52px)' }}>
             Resumen copiado
           </div>
         )}

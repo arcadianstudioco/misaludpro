@@ -95,6 +95,13 @@ export function OutdoorRunTracker({
     requestInitialLocation();
   }, [requestInitialLocation]);
 
+  // Listen for flutter-back (iOS back swipe / Android back button) → close tracker
+  useEffect(() => {
+    const handler = () => onClose();
+    window.addEventListener('flutter-back', handler);
+    return () => window.removeEventListener('flutter-back', handler);
+  }, [onClose]);
+
   // Real mobile GPS watchPosition while running
   useEffect(() => {
     if (status !== 'running' || !('geolocation' in navigator)) return;
@@ -216,8 +223,11 @@ export function OutdoorRunTracker({
 
   return (
     <div className="fixed inset-0 z-50 bg-black text-white flex flex-col keep-dark">
-      {/* Top Bar */}
-      <div className="px-4 pt-3 pb-2 flex items-center justify-between gap-2 bg-black border-b border-white/8 shrink-0">
+      {/* Top Bar – padded for status bar */}
+      <div
+        className="px-4 pb-2 flex items-center justify-between gap-2 bg-black border-b border-white/8 shrink-0"
+        style={{ paddingTop: 'max(12px, env(safe-area-inset-top, 12px))' }}
+      >
         <button
           type="button"
           onClick={onClose}
