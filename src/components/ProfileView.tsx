@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Bell,
   Camera,
@@ -26,12 +26,6 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
-import {
-  getSavedSupabaseConfig,
-  isSupabaseConfigured,
-  saveSupabaseConfig,
-  getSupabaseClient,
-} from '../services/supabaseClient';
 import { SyncStatus } from '../services/localPersistence';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
 import {
@@ -103,48 +97,19 @@ export function ProfileView({
   const [pdfFeedback, setPdfFeedback] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Supabase state
-  const [showSupabaseModal, setShowSupabaseModal] = useState(false);
-  const [supabaseConfigState, setSupabaseConfigState] = useState(getSavedSupabaseConfig);
-  const [supabaseUrlInput, setSupabaseUrlInput] = useState(getSavedSupabaseConfig().url);
-  const [supabaseKeyInput, setSupabaseKeyInput] = useState(getSavedSupabaseConfig().anonKey);
-  const [supabaseTesting, setSupabaseTesting] = useState(false);
-  const [supabaseFeedback, setSupabaseFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
-
-  const handleSaveAndTestSupabase = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSupabaseTesting(true);
-    setSupabaseFeedback(null);
-    saveSupabaseConfig(supabaseUrlInput, supabaseKeyInput);
-    setSupabaseConfigState({ url: supabaseUrlInput, anonKey: supabaseKeyInput });
-
-    try {
-      const client = getSupabaseClient();
-      if (!client) {
-        setSupabaseFeedback({ ok: false, msg: 'Ingresa una URL válida de Supabase y tu anon key.' });
-        setSupabaseTesting(false);
-        return;
-      }
-      const { error } = await client.from('user_app_states').select('user_id', { head: true, count: 'exact' });
-      if (error && error.code !== 'PGRST116') {
-        setSupabaseFeedback({
-          ok: true,
-          msg: '¡Conectado exitosamente con tu proyecto Supabase!',
-        });
-      } else {
-        setSupabaseFeedback({ ok: true, msg: '¡Conectado exitosamente a Supabase!' });
-      }
-    } catch (err) {
-      setSupabaseFeedback({
-        ok: false,
-        msg: err instanceof Error ? err.message : 'Error al conectar con Supabase',
-      });
-    } finally {
-      setSupabaseTesting(false);
-    }
-  };
-
   const [cropSrc, setCropSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onBack = () => {
+      if (cropSrc) setCropSrc(null);
+      else if (legalTab) setLegalTab(null);
+      else if (showPasswordModal) setShowPasswordModal(false);
+      else if (showEditModal) setShowEditModal(false);
+      else if (showDeleteConfirm) setShowDeleteConfirm(false);
+    };
+    window.addEventListener('flutter-back', onBack);
+    return () => window.removeEventListener('flutter-back', onBack);
+  }, [cropSrc, legalTab, showPasswordModal, showEditModal, showDeleteConfirm]);
   const [cropZoom, setCropZoom] = useState(1);
   const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
   const [cropImgSize, setCropImgSize] = useState<{ w: number; h: number } | null>(null);
@@ -520,53 +485,6 @@ export function ProfileView({
         </div>
       </div>
 
-      {/* Supabase Real Database Connection Card */}
-      <div className="rounded-3xl bg-[#131A16] border border-[#74D834]/30 p-4 space-y-3 relative overflow-hidden shadow-lg">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#74D834]/15 border border-[#74D834]/30 text-[#74D834] flex items-center justify-center font-bold text-sm">
-              ⚡
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h3 className="font-display text-sm font-bold text-white">
-                  Base de Datos Supabase
-                </h3>
-                <span className="px-2 py-0.5 rounded-full bg-[#74D834]/20 border border-[#74D834]/40 text-[10px] font-bold text-[#74D834]">
-                  Conectado
-                </span>
-              </div>
-              <p className="text-[11px] text-[#9AA89E]">
-                Proyecto: <span className="font-mono text-white">piyqybeukazjpqiqxeup</span>
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowSupabaseModal(true)}
-            className="px-2.5 py-1 rounded-xl bg-[#1C261F] hover:bg-[#253329] border border-white/10 text-[11px] font-semibold text-[#E2EAE3] flex items-center gap-1 cursor-pointer transition-colors"
-          >
-            <Pencil className="w-3 h-3 text-[#74D834]" />
-            Configurar
-          </button>
-        </div>
-
-        <div className="rounded-2xl bg-[#0D120F] border border-white/6 p-3 text-xs space-y-1.5">
-          <div className="flex items-center justify-between text-[#B2C0B6]">
-            <span>URL del Proyecto:</span>
-            <span className="font-mono text-[10px] text-[#74D834] truncate max-w-[190px]">
-              piyqybeukazjpqiqxeup.supabase.co
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-[#B2C0B6] pt-1 border-t border-white/6">
-            <span>Autenticación y Sync:</span>
-            <span className="text-[#74D834] font-medium flex items-center gap-1 text-[11px]">
-              <Check className="w-3.5 h-3.5" /> Activo en tiempo real
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* Robust Local Persistence & Sync Card */}
       <div className="rounded-3xl bg-[#131A16] border border-white/8 p-4 space-y-3">
         <div className="flex items-center justify-between">
@@ -756,88 +674,6 @@ export function ProfileView({
           <span>Eliminar cuenta y datos</span>
         </button>
       </div>
-
-      {/* Supabase Configuration Modal */}
-      {showSupabaseModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3">
-          <form
-            onSubmit={handleSaveAndTestSupabase}
-            className="w-full max-w-sm rounded-3xl bg-[#141C17] border border-white/10 p-5 space-y-3.5"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-[#74D834] text-lg">⚡</span>
-                <h3 className="font-display text-base font-bold text-white">Configuración Supabase</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowSupabaseModal(false)}
-                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-[#9AA89E] cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-[#9AA89E] leading-relaxed">
-              Base de datos en la nube conectada directamente para sincronización y autenticación de usuarios.
-            </p>
-
-            <div className="space-y-2.5">
-              <label className="block space-y-1">
-                <span className="text-[10px] text-[#9AA89E]">Project URL</span>
-                <input
-                  type="text"
-                  value={supabaseUrlInput}
-                  onChange={(e) => setSupabaseUrlInput(e.target.value)}
-                  placeholder="https://xyz.supabase.co"
-                  className="w-full min-h-[40px] px-3 rounded-xl bg-[#0D120F] border border-white/10 text-xs font-mono text-white"
-                />
-              </label>
-
-              <label className="block space-y-1">
-                <span className="text-[10px] text-[#9AA89E]">Publishable / Anon Key</span>
-                <input
-                  type="password"
-                  value={supabaseKeyInput}
-                  onChange={(e) => setSupabaseKeyInput(e.target.value)}
-                  placeholder="sb_publishable_..."
-                  className="w-full min-h-[40px] px-3 rounded-xl bg-[#0D120F] border border-white/10 text-xs font-mono text-white"
-                />
-              </label>
-            </div>
-
-            {supabaseFeedback && (
-              <div
-                className={`p-2.5 rounded-xl border text-xs flex items-center gap-2 ${
-                  supabaseFeedback.ok
-                    ? 'bg-[#74D834]/15 border-[#74D834]/30 text-[#74D834]'
-                    : 'bg-red-500/15 border-red-500/30 text-red-300'
-                }`}
-              >
-                {supabaseFeedback.ok ? <Check className="w-4 h-4 shrink-0" /> : <X className="w-4 h-4 shrink-0" />}
-                <span>{supabaseFeedback.msg}</span>
-              </div>
-            )}
-
-            <div className="flex gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setShowSupabaseModal(false)}
-                className="flex-1 min-h-[42px] rounded-xl bg-[#1C261F] text-xs font-medium text-white cursor-pointer"
-              >
-                Cerrar
-              </button>
-              <button
-                type="submit"
-                disabled={supabaseTesting}
-                className="flex-1 min-h-[42px] rounded-xl font-display font-semibold text-xs text-[#081007] bg-gradient-to-r from-[#82E63E] to-[#58C222] cursor-pointer disabled:opacity-60"
-              >
-                {supabaseTesting ? 'Verificando...' : 'Guardar y Probar'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {/* Edit Profile Modal */}
       {showEditModal && (

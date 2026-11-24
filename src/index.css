@@ -86,6 +86,22 @@ textarea {
   scrollbar-width: none !important;
 }
 
+.leaflet-container {
+  z-index: 0 !important;
+  background: #1B2432 !important;
+}
+
+.leaflet-control-attribution {
+  font-size: 9px !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+  border-radius: 6px 0 0 0;
+}
+
+.leaflet-control-attribution a {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+
 html.light ::-webkit-scrollbar-track {
   background: #eef2ee;
 }

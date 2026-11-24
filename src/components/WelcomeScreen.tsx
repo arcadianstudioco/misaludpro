@@ -127,6 +127,23 @@ export function WelcomeScreen({
   const [mode, setMode] = useState<'landing' | 'onboarding' | 'login'>('landing');
   const [step, setStep] = useState<1 | 2>(1);
 
+  useEffect(() => {
+    const onBack = () => {
+      if (mode === 'login') {
+        setMode('landing');
+        setError('');
+        setOauthSetupNotice(null);
+      } else if (mode === 'onboarding') {
+        if (step === 2) setStep(1);
+        else setMode('landing');
+        setError('');
+        setOauthSetupNotice(null);
+      }
+    };
+    window.addEventListener('flutter-back', onBack);
+    return () => window.removeEventListener('flutter-back', onBack);
+  }, [mode, step]);
+
   // Login form state
   const [loginEmail, setLoginEmail] = useState(savedPrefs.email);
   const [loginPassword, setLoginPassword] = useState('');

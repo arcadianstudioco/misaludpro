@@ -114,6 +114,43 @@ export default function App() {
     return () => window.removeEventListener('flutter-back', onFlutterBack);
   }, [showHealthSubView, activeReminderToast]);
 
+  // Global left-edge swipe-right gesture (iOS-style back swipe everywhere)
+  useEffect(() => {
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (t.clientX <= 30) {
+        startX = t.clientX;
+        startY = t.clientY;
+        tracking = true;
+      } else {
+        tracking = false;
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!tracking || e.changedTouches.length !== 1) return;
+      tracking = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - startX;
+      const dy = Math.abs(t.clientY - startY);
+      if (dx >= 65 && dy < 55) {
+        window.dispatchEvent(new CustomEvent('flutter-back'));
+      }
+    };
+
+    document.addEventListener('touchstart', onTouchStart, { passive: true });
+    document.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      document.removeEventListener('touchstart', onTouchStart);
+      document.removeEventListener('touchend', onTouchEnd);
+    };
+  }, []);
+
   // Real-time reminder scheduler matching user's configured times
   useEffect(() => {
     if (!state || !state.isAuthenticated) return;

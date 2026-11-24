@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -99,6 +99,16 @@ export function StatsView({
   const [showSevenDayHistory, setShowSevenDayHistory] = useState(true);
   const [noteDraft, setNoteDraft] = useState(() => dailyNotes[todayDate] || '');
   const [noteSavedToast, setNoteSavedToast] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<ProgressPhoto | null>(null);
+
+  useEffect(() => {
+    const onBack = () => {
+      if (selectedPhoto) setSelectedPhoto(null);
+      else if (showAddModal) setShowAddModal(false);
+    };
+    window.addEventListener('flutter-back', onBack);
+    return () => window.removeEventListener('flutter-back', onBack);
+  }, [selectedPhoto, showAddModal]);
 
   const sorted = useMemo(
     () => [...measurements].sort((a, b) => a.date.localeCompare(b.date)),
@@ -765,7 +775,9 @@ export function StatsView({
             <h3 className="font-display text-xs font-bold text-white">
               Fotografías de progreso (opcional)
             </h3>
-            <p className="text-[11px] text-[#8E9D93]">Privadas en tu dispositivo</p>
+            <p className="text-[11px] text-[#8E9D93]">
+              Compara tu cambio físico · Toca una foto para ampliar
+            </p>
           </div>
           <label className="min-h-[36px] px-3 rounded-xl bg-[#1B241E] text-xs font-medium text-[#74D834] inline-flex items-center gap-1.5 cursor-pointer">
             <Camera className="w-3.5 h-3.5" />
@@ -779,12 +791,24 @@ export function StatsView({
             {progressPhotos.map((ph) => (
               <div
                 key={ph.id}
-                className="relative rounded-xl overflow-hidden bg-[#0D120F] border border-white/8 aspect-[3/4]"
+                onClick={() => setSelectedPhoto(ph)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') setSelectedPhoto(ph);
+                }}
+                className="relative rounded-xl overflow-hidden bg-[#0D120F] border border-white/8 aspect-[3/4] cursor-pointer"
               >
                 <img src={ph.dataUrl} alt={ph.label} className="w-full h-full object-cover" />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-1.5 py-1 pointer-events-none">
+                  <p className="text-[9px] text-white/90 truncate">{formatShortDate(ph.date)}</p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => onDeletePhoto(ph.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeletePhoto(ph.id);
+                  }}
                   aria-label="Eliminar foto"
                   className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center cursor-pointer keep-dark"
                 >
@@ -876,6 +900,61 @@ export function StatsView({
               Guardar en estadísticas
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Fullscreen Progress Photo Lightbox */}
+      {selectedPhoto && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col keep-dark"
+          onClick={() => setSelectedPhoto(null)}
+        >
+          <div
+            className="px-4 pb-3 flex items-center justify-between gap-3 shrink-0"
+            style={{ paddingTop: 'max(14px, env(safe-area-inset-top, 14px))' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="min-w-0">
+              <p className="font-display text-sm font-bold text-white truncate">
+                {selectedPhoto.label || 'Foto de progreso'}
+              </p>
+              <p className="text-[11px] text-[#9AA89E]">
+                {formatShortDate(selectedPhoto.date)} · Privada en tu dispositivo
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  onDeletePhoto(selectedPhoto.id);
+                  setSelectedPhoto(null);
+                }}
+                aria-label="Eliminar foto"
+                className="w-9 h-9 rounded-full bg-white/10 text-red-400 flex items-center justify-center cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPhoto(null)}
+                aria-label="Cerrar foto"
+                className="w-9 h-9 rounded-full bg-white/10 text-white flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4.5 h-4.5" />
+              </button>
+            </div>
+          </div>
+
+          <div
+            className="flex-1 flex items-center justify-center p-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={selectedPhoto.dataUrl}
+              alt={selectedPhoto.label}
+              className="max-w-full max-h-full rounded-2xl object-contain"
+            />
+          </div>
         </div>
       )}
     </div>
