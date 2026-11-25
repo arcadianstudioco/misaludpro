@@ -8,11 +8,17 @@ import {
   ChevronDown,
   ChevronUp,
   Dumbbell,
+  Loader2,
   NotebookPen,
   Plus,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
+import {
+  analyzeProgressDiagnosis,
+  ProgressDiagnosis,
+} from '../services/aiClient';
 import {
   CartesianGrid,
   Line,
@@ -41,6 +47,10 @@ interface StatsViewProps {
   dailyNotes: Record<string, string>;
   heightCm?: number;
   age?: number;
+  goal?: string;
+  targetWeightKg?: number;
+  calorieTargetMin?: number;
+  calorieTargetMax?: number;
   onAddMeasurement: (entry: Omit<BodyMeasurement, 'id' | 'date'>) => void;
   onAddPhoto: (label: string, dataUrl: string) => void;
   onDeletePhoto: (photoId: string) => void;
@@ -87,6 +97,10 @@ export function StatsView({
   dailyNotes,
   heightCm = 182.88,
   age = 33,
+  goal = 'Mantener / Mejorar composición',
+  targetWeightKg,
+  calorieTargetMin = 1700,
+  calorieTargetMax = 2100,
   onAddMeasurement,
   onAddPhoto,
   onDeletePhoto,
@@ -100,6 +114,9 @@ export function StatsView({
   const [noteDraft, setNoteDraft] = useState(() => dailyNotes[todayDate] || '');
   const [noteSavedToast, setNoteSavedToast] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<ProgressPhoto | null>(null);
+  const [aiDiagnosis, setAiDiagnosis] = useState<ProgressDiagnosis | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   useEffect(() => {
     const onBack = () => {
@@ -109,6 +126,60 @@ export function StatsView({
     window.addEventListener('flutter-back', onBack);
     return () => window.removeEventListener('flutter-back', onBack);
   }, [selectedPhoto, showAddModal]);
+
+  const handleRunAiDiagnosis = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const cutoff14 = daysAgoIso(13);
+      const recentMeals = meals.filter((m) => m.date >= cutoff14);
+      const mealDays = new Set(recentMeals.map((m) => m.date)).size || 1;
+      const totalCals = recentMeals.reduce((acc, m) => acc + (Number(m.calories) || 0), 0);
+      const recentWorkouts = workoutSessions.filter((w) => w.date >= cutoff14).length;
+
+      const habitEntries = Object.values(habitsByDate).filter((h) => h.date >= cutoff14);
+      const avgSleep =
+        habitEntries.length > 0
+          ? Number(
+              (
+                habitEntries.reduce((a, h) => a + (Number(h.sleepHours) || 0), 0) /
+                habitEntries.length
+              ).toFixed(1)
+            )
+          : 0;
+      const avgWater =
+        habitEntries.length > 0
+          ? Number(
+              (
+                habitEntries.reduce((a, h) => a + (Number(h.waterLiters) || 0), 0) /
+                habitEntries.length
+              ).toFixed(1)
+            )
+          : 0;
+
+      const currentW = latest?.weightKg ?? 0;
+      const result = await analyzeProgressDiagnosis({
+        goal,
+        currentWeightKg: currentW,
+        targetWeightKg: targetWeightKg ?? currentW,
+        weightDeltaKg: weightDelta,
+        waistLatestCm: latest?.waistCm ?? 0,
+        avgDailyCalories: Math.round(totalCals / mealDays),
+        calorieTargetRange: `${calorieTargetMin}-${calorieTargetMax} kcal`,
+        workoutsLast14d: recentWorkouts,
+        avgSleepHours: avgSleep,
+        avgWaterLiters: avgWater,
+        measurementsCount: measurements.length,
+      });
+      setAiDiagnosis(result);
+    } catch (err) {
+      setAiError(
+        err instanceof Error ? err.message : 'No se pudo generar el diagnóstico.'
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const sorted = useMemo(
     () => [...measurements].sort((a, b) => a.date.localeCompare(b.date)),
@@ -547,6 +618,54 @@ export function StatsView({
             );
           })}
         </div>
+      </div>
+
+      {/* AI Progress & Plateau Diagnosis Card */}
+      <div className="rounded-3xl bg-[#131A16] border border-[#74D834]/25 p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-[#74D834]/15 text-[#74D834] flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-display text-sm font-bold text-white truncate">
+                Diagnóstico inteligente
+              </h2>
+              <p className="text-[11px] text-[#8E9D93] truncate">
+                Detecta mesetas y ajusta tu semana según tus datos reales
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={aiLoading}
+            onClick={() => void handleRunAiDiagnosis()}
+            className="min-h-[34px] px-3 rounded-xl bg-[#74D834]/18 border border-[#74D834]/40 text-[11px] font-semibold text-[#74D834] hover:bg-[#74D834] hover:text-[#081007] transition-colors inline-flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-60"
+          >
+            {aiLoading ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Analizando...</span></>
+            ) : (
+              <span>{aiDiagnosis ? 'Actualizar' : 'Analizar'}</span>
+            )}
+          </button>
+        </div>
+        {aiError && (
+          <p className="text-[11px] text-[#E57368] bg-[#E57368]/10 border border-[#E57368]/25 rounded-xl px-3 py-2">{aiError}</p>
+        )}
+        {aiDiagnosis && (
+          <div className="rounded-2xl bg-[#0D120F] border border-white/8 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-bold text-white">{aiDiagnosis.headline}</p>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${aiDiagnosis.status === 'on_track' ? 'bg-[#74D834]/18 text-[#74D834]' : aiDiagnosis.status === 'plateau' ? 'bg-[#FBBF24]/18 text-[#FBBF24]' : 'bg-[#E57368]/18 text-[#E57368]'}`}>
+                {aiDiagnosis.status === 'on_track' ? 'En ritmo' : aiDiagnosis.status === 'plateau' ? 'Meseta' : 'Atención'}
+              </span>
+            </div>
+            <p className="text-[11px] text-[#C5D0C8] leading-relaxed">{aiDiagnosis.diagnosis}</p>
+            <div className="pt-1.5 border-t border-white/6 text-[11px] text-[#74D834] font-medium">
+              Ajuste recomendado: {aiDiagnosis.actionStep}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Collapsible 7-Day Historical Summary */}

@@ -420,6 +420,10 @@ export default function App() {
             onAddPhoto={addProgressPhoto}
             onDeletePhoto={deleteProgressPhoto}
             onSaveDailyNote={saveDailyNote}
+            goal={state.profile.goal}
+            targetWeightKg={state.profile.targetWeightKg}
+            calorieTargetMin={state.profile.calorieTargetMin}
+            calorieTargetMax={state.profile.calorieTargetMax}
           />
         )}
 

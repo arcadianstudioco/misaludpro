@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import {
   Calculator,
+  Camera,
   Check,
   FileText,
   Flame,
+  Loader2,
   Plus,
   ShoppingBag,
   Sparkles,
@@ -11,6 +13,7 @@ import {
   Utensils,
   X,
 } from 'lucide-react';
+import { analyzeMealPhoto } from '../services/aiClient';
 import {
   MealEntry,
   MealSlot,
@@ -86,6 +89,9 @@ export function NutritionView({
   const [calcFat, setCalcFat] = useState('12');
   const [calcCal, setCalcCal] = useState('388');
   const [calcSavedToast, setCalcSavedToast] = useState<string | null>(null);
+  const [photoScanning, setPhotoScanning] = useState(false);
+  const [photoScanNote, setPhotoScanNote] = useState<string | null>(null);
+  const [photoScanError, setPhotoScanError] = useState<string | null>(null);
 
   // Real-Food Routine Catalog Category State
   const [routineCategory, setRoutineCategory] = useState<MealSlot>('Desayuno');
@@ -170,8 +176,35 @@ export function NutritionView({
     });
 
     setCalcName('');
+    setPhotoScanNote(null);
     setCalcSavedToast(`${label} (+${effectiveKcal} kcal)`);
     window.setTimeout(() => setCalcSavedToast(null), 2200);
+  };
+
+  const handleMealPhotoScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setPhotoScanning(true);
+    setPhotoScanError(null);
+    setPhotoScanNote(null);
+    try {
+      const result = await analyzeMealPhoto(file);
+      setCalcName(result.name);
+      setCalcPro(String(result.proteinG));
+      setCalcCarbs(String(result.carbsG));
+      setCalcFat(String(result.fatG));
+      setCalcCal(String(result.calories));
+      setCalcAutoKcal(false);
+      setPhotoScanNote(`${result.portion} · ${result.confidenceNote}`);
+    } catch (err) {
+      setPhotoScanError(
+        err instanceof Error ? err.message : 'No se pudo analizar la foto del plato.'
+      );
+    } finally {
+      setPhotoScanning(false);
+    }
   };
 
   const handleQuickAddRoutineFood = (
@@ -333,6 +366,59 @@ export function NutritionView({
             {calcAutoKcal ? 'Auto kcal: ON' : 'Kcal manual'}
           </button>
         </div>
+
+        {/* Photo Meal Scanner (AI) */}
+        <div className="flex items-center justify-between gap-2 rounded-2xl bg-[#0D120F] border border-[#74D834]/25 p-2.5">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-white flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#74D834] shrink-0" />
+              <span>Escanear plato con IA</span>
+            </p>
+            <p className="text-[10px] text-[#8E9D93] truncate">
+              Toma o sube una foto para calcular calorías y macros
+            </p>
+          </div>
+          <label
+            className={`min-h-[36px] px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 ${
+              photoScanning
+                ? 'bg-[#1C261F] text-[#9AA89E] cursor-wait'
+                : 'bg-[#74D834]/18 border border-[#74D834]/40 text-[#74D834] cursor-pointer hover:bg-[#74D834] hover:text-[#081007] transition-colors'
+            }`}
+          >
+            {photoScanning ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Analizando...</span>
+              </>
+            ) : (
+              <>
+                <Camera className="w-3.5 h-3.5" />
+                <span>Foto del plato</span>
+              </>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              disabled={photoScanning}
+              onChange={(e) => void handleMealPhotoScan(e)}
+              className="hidden"
+            />
+          </label>
+        </div>
+
+        {photoScanNote && (
+          <div className="px-3 py-2 rounded-xl bg-[#74D834]/12 border border-[#74D834]/35 text-[11px] text-[#D2DDD5] flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-[#74D834] shrink-0" />
+            <span className="truncate">{photoScanNote}</span>
+          </div>
+        )}
+
+        {photoScanError && (
+          <div className="px-3 py-2 rounded-xl bg-[#E57368]/12 border border-[#E57368]/35 text-[11px] text-[#E57368]">
+            {photoScanError}
+          </div>
+        )}
 
         {/* Category Selector */}
         <div className="grid grid-cols-4 gap-1.5">
