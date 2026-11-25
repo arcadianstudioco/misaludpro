@@ -244,6 +244,7 @@ export function useHealthStore() {
               email: sbUser.email || '',
               name: (sbUser.user_metadata?.name as string) || sbUser.email?.split('@')[0] || 'Usuario',
               provider: 'supabase',
+              acceptedTermsAt: new Date().toISOString(),
               verified: Boolean(sbUser.email_confirmed_at),
             };
             setAuthUser(authUsr);

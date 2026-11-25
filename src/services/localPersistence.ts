@@ -204,11 +204,11 @@ export async function loadLocalState(): Promise<AppState | null> {
 export async function clearAllLocalState(): Promise<void> {
   await idbDelete(STORE_STATE, 'active_state');
   await idbDelete(STORE_AUTH, 'active_user');
-  await idbDelete(STORE_SYNC, 'metadata');
+  await idbDelete(STORE_META, 'metadata');
   try {
     localStorage.removeItem(LOCAL_FALLBACK_STATE_KEY);
     localStorage.removeItem(LOCAL_FALLBACK_AUTH_KEY);
-    localStorage.removeItem(LOCAL_FALLBACK_SYNC_KEY);
+    localStorage.removeItem(LOCAL_FALLBACK_META_KEY);
   } catch {
     // Ignore storage clear errors
   }

@@ -10,6 +10,7 @@ export interface AuthUser {
   name: string;
   provider: AuthProvider;
   acceptedTermsAt: string;
+  verified?: boolean;
 }
 
 export interface AuthResponsePayload {

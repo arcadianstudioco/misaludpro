@@ -135,7 +135,9 @@ export function StatsView({
       const recentMeals = meals.filter((m) => m.date >= cutoff14);
       const mealDays = new Set(recentMeals.map((m) => m.date)).size || 1;
       const totalCals = recentMeals.reduce((acc, m) => acc + (Number(m.calories) || 0), 0);
-      const recentWorkouts = workoutSessions.filter((w) => w.date >= cutoff14).length;
+      const recentWorkouts = workoutSessions.filter(
+        (w) => (w.completedAt || '').slice(0, 10) >= cutoff14
+      ).length;
 
       const habitEntries = Object.values(habitsByDate).filter((h) => h.date >= cutoff14);
       const avgSleep =

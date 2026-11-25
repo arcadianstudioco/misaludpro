@@ -183,6 +183,10 @@ class _MiSaludProWebViewState extends State<MiSaludProWebView> {
         if (didPop) return;
         if (await _controller.canGoBack()) {
           await _controller.goBack();
+        } else {
+          await _controller.runJavaScript(
+            "window.dispatchEvent(new CustomEvent('flutter-back'));",
+          );
         }
       },
       child: Scaffold(

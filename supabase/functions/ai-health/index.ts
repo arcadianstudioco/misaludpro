@@ -1,5 +1,5 @@
 // Supabase Edge Function: ai-health
-// Handles non-chat AI features for Mi Salud Pro via Gemini 2.5 Flash.
+// Handles non-chat AI features for Mi Salud Pro via Gemini 3.8 Flash.
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -14,40 +14,65 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+const GEMINI_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.5-flash',
+  'gemini-flash-latest',
+  'gemini-3.5-flash-lite',
+];
+
 async function callGemini(
   apiKey: string,
   parts: Array<Record<string, unknown>>,
   systemInstruction: string
 ): Promise<unknown> {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(
-    apiKey
-  )}`;
+  let lastError = 'No se pudo obtener respuesta de IA.';
 
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemInstruction }] },
-      contents: [{ role: 'user', parts }],
-      generationConfig: {
-        temperature: 0.25,
-        responseMimeType: 'application/json',
-      },
-    }),
-  });
+  for (const model of GEMINI_MODELS) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
+      apiKey
+    )}`;
 
-  const data = await res.json();
-  if (!res.ok) {
-    const msg = data?.error?.message || `Gemini error (${res.status})`;
-    throw new Error(msg);
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        contents: [{ role: 'user', parts }],
+        generationConfig: {
+          temperature: 0.25,
+          responseMimeType: 'application/json',
+        },
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      lastError = data?.error?.message || `Gemini error (${res.status})`;
+      // Retry next model on high demand, rate limit, or model deprecation
+      if (
+        res.status === 429 ||
+        res.status === 503 ||
+        res.status === 404 ||
+        res.status === 400 ||
+        /high demand|no longer available|overloaded|quota/i.test(lastError)
+      ) {
+        continue;
+      }
+      throw new Error(lastError);
+    }
+
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text || typeof text !== 'string') {
+      lastError = 'La IA no devolvió una respuesta válida.';
+      continue;
+    }
+
+    return JSON.parse(text);
   }
 
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text || typeof text !== 'string') {
-    throw new Error('La IA no devolvió una respuesta válida.');
-  }
-
-  return JSON.parse(text);
+  throw new Error(lastError);
 }
 
 Deno.serve(async (req) => {
