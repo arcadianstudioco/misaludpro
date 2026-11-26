@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronLeft,
   Dumbbell,
   Footprints,
   Plus,
   SquarePen,
+  Trash2,
   X,
 } from 'lucide-react';
 import { OutdoorActivityType, WorkoutSessionLog } from '../types/health';
@@ -24,6 +25,7 @@ interface SessionsModalProps {
     caloriesBurned: number,
     extra?: Partial<WorkoutSessionLog>
   ) => WorkoutSessionLog;
+  onDeleteSession?: (sessionId: string) => void;
 }
 
 const MONTHS_ES = [
@@ -91,10 +93,13 @@ export function SessionsModal({
   todayDate,
   onClose,
   onAddManualSession,
+  onDeleteSession,
 }: SessionsModalProps) {
   const [filter, setFilter] = useState<SessionFilter>('todos');
   const [selectedSession, setSelectedSession] = useState<WorkoutSessionLog | null>(null);
   const [showManualForm, setShowManualForm] = useState(false);
+  const [swipedId, setSwipedId] = useState<string | null>(null);
+  const touchStartX = useRef<number>(0);
 
   // Manual form fields
   const [manualType, setManualType] = useState<'Carrera al aire libre' | 'Caminata al aire libre' | 'Entrenamiento'>('Carrera al aire libre');
@@ -107,7 +112,9 @@ export function SessionsModal({
   // Listen for flutter-back (iOS back swipe / Android back button)
   useEffect(() => {
     const handler = () => {
-      if (selectedSession) {
+      if (swipedId) {
+        setSwipedId(null);
+      } else if (selectedSession) {
         setSelectedSession(null);
       } else if (showManualForm) {
         setShowManualForm(false);
@@ -117,7 +124,7 @@ export function SessionsModal({
     };
     window.addEventListener('flutter-back', handler);
     return () => window.removeEventListener('flutter-back', handler);
-  }, [onClose, selectedSession, showManualForm]);
+  }, [onClose, selectedSession, showManualForm, swipedId]);
 
   const filteredSessions = useMemo(() => {
     const sorted = [...sessions].sort((a, b) =>
@@ -203,12 +210,23 @@ export function SessionsModal({
       <WorkoutSummaryAppleCard
         session={selectedSession}
         onClose={() => setSelectedSession(null)}
+        onDelete={
+          onDeleteSession
+            ? () => {
+                onDeleteSession(selectedSession.id);
+                setSelectedSession(null);
+              }
+            : undefined
+        }
       />
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0A0D0B] text-white flex flex-col overflow-y-auto keep-dark">
+    <div
+      className="fixed inset-0 z-50 bg-[#0A0D0B] text-white flex flex-col overflow-y-auto keep-dark"
+      onClick={() => { if (swipedId) setSwipedId(null); }}
+    >
       {/* Top Safe-Area Header */}
       <div
         className="px-4 pb-3 flex items-center justify-between bg-[#0A0D0B]/95 backdrop-blur-md sticky top-0 z-20"
@@ -363,7 +381,7 @@ export function SessionsModal({
                   </div>
                 )}
 
-                {/* Sessions List */}
+                {/* Sessions List — swipe-to-delete */}
                 <div className="space-y-2.5">
                   {group.items.map((s) => {
                     const kind = classifySession(s);
@@ -372,37 +390,68 @@ export function SessionsModal({
                       ? `${s.distanceMiles!.toFixed(2)} MI`
                       : `${Math.round(s.durationSec / 60)} MIN · ${s.caloriesBurned} CAL`;
 
+                    const isSwiped = swipedId === s.id;
+
                     return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => setSelectedSession(s)}
-                        className="w-full rounded-2xl bg-[#131A16] border border-white/8 hover:border-[#74D834]/35 p-3.5 flex items-center gap-3 text-left transition-colors cursor-pointer"
-                      >
-                        <div className="w-11 h-11 rounded-full bg-[#74D834]/15 border border-[#74D834]/30 flex items-center justify-center text-[#74D834] shrink-0">
-                          {kind === 'entrenamiento' ? (
-                            <Dumbbell className="w-5 h-5" />
-                          ) : (
-                            <Footprints className="w-5 h-5" />
-                          )}
+                      <div key={s.id} className="relative overflow-hidden rounded-2xl">
+                        {/* Red delete layer revealed on swipe */}
+                        <div className="absolute inset-0 flex items-center justify-end pr-4 bg-[#E53935] rounded-2xl">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteSession?.(s.id);
+                              setSwipedId(null);
+                            }}
+                            className="text-white font-semibold text-xs flex flex-col items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                            <span>Eliminar</span>
+                          </button>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-white truncate">
-                            {s.activityType || s.routineTitle}
-                          </p>
-                          <p className="font-mono-nums text-lg font-extrabold text-[#74D834] leading-tight">
-                            {primaryMetric}
-                          </p>
+
+                        {/* Main card — slides left when swiped */}
+                        <div
+                          className={`relative w-full rounded-2xl bg-[#131A16] border ${isSwiped ? 'border-[#E53935]/40' : 'border-white/8'} p-3.5 flex items-center gap-3 transition-transform duration-200 cursor-pointer`}
+                          style={{ transform: isSwiped ? 'translateX(-80px)' : 'translateX(0)' }}
+                          onTouchStart={(e) => {
+                            touchStartX.current = e.touches[0].clientX;
+                          }}
+                          onTouchEnd={(e) => {
+                            const delta = touchStartX.current - e.changedTouches[0].clientX;
+                            if (delta > 60) setSwipedId(s.id);
+                            else if (delta < -20) setSwipedId(null);
+                          }}
+                          onClick={() => {
+                            if (isSwiped) { setSwipedId(null); return; }
+                            setSelectedSession(s);
+                          }}
+                        >
+                          <div className="w-11 h-11 rounded-full bg-[#74D834]/15 border border-[#74D834]/30 flex items-center justify-center text-[#74D834] shrink-0">
+                            {kind === 'entrenamiento' ? (
+                              <Dumbbell className="w-5 h-5" />
+                            ) : (
+                              <Footprints className="w-5 h-5" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-white truncate">
+                              {s.activityType || s.routineTitle}
+                            </p>
+                            <p className="font-mono-nums text-lg font-extrabold text-[#74D834] leading-tight">
+                              {primaryMetric}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0 space-y-0.5">
+                            <p className="text-[11px] text-[#8E9D93]">
+                              {getShortDayLabel(s.completedAt, todayDate)}
+                            </p>
+                            <p className="font-mono-nums text-[10px] text-[#6E7C73]">
+                              {formatStopwatchDuration(s.durationSec)}
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-right shrink-0 space-y-0.5">
-                          <p className="text-[11px] text-[#8E9D93]">
-                            {getShortDayLabel(s.completedAt, todayDate)}
-                          </p>
-                          <p className="font-mono-nums text-[10px] text-[#6E7C73]">
-                            {formatStopwatchDuration(s.durationSec)}
-                          </p>
-                        </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>

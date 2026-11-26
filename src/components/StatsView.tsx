@@ -63,6 +63,7 @@ interface StatsViewProps {
     caloriesBurned: number,
     extra?: Partial<WorkoutSessionLog>
   ) => WorkoutSessionLog;
+  onDeleteSession?: (sessionId: string) => void;
 }
 
 type RangeKey = '7d' | '30d' | '90d' | '1a';
@@ -114,6 +115,7 @@ export function StatsView({
   onDeletePhoto,
   onSaveDailyNote,
   onAddManualSession,
+  onDeleteSession,
 }: StatsViewProps) {
   const [range, setRange] = useState<RangeKey>('30d');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -407,6 +409,7 @@ export function StatsView({
           sessions={workoutSessions}
           todayDate={todayDate}
           onAddManualSession={onAddManualSession}
+          onDeleteSession={onDeleteSession}
         />
       )}
 

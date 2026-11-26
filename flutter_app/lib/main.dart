@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -42,10 +43,47 @@ class MiSaludProWebView extends StatefulWidget {
 }
 
 class _MiSaludProWebViewState extends State<MiSaludProWebView> {
+  static const _alarmChannel = MethodChannel('com.misaludpro/alarms');
   late final WebViewController _controller;
   HttpServer? _localServer;
   bool _isLoading = true;
   String? _errorMessage;
+
+  Future<void> _handleFlutterChannelMessage(String raw) async {
+    if (raw == 'back') {
+      if (mounted) {
+        _controller.runJavaScript(
+          "window.dispatchEvent(new CustomEvent('flutter-back'));",
+        );
+      }
+      return;
+    }
+
+    if (!raw.startsWith('{')) return;
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      final action = decoded['action'] as String?;
+      if (!Platform.isIOS) return;
+
+      if (action == 'requestAlarmPermission') {
+        final granted = await _alarmChannel.invokeMethod<bool>('requestPermission') ?? false;
+        if (mounted) {
+          _controller.runJavaScript(
+            "window.dispatchEvent(new CustomEvent('flutter-alarm-status', { detail: { granted: $granted } }));",
+          );
+        }
+      } else if (action == 'syncAlarms') {
+        final alarms = decoded['alarms'];
+        if (alarms is List) {
+          await _alarmChannel.invokeMethod('syncAlarms', alarms);
+        }
+      } else if (action == 'openClock') {
+        await _alarmChannel.invokeMethod('openClockApp');
+      }
+    } catch (e) {
+      debugPrint('FlutterChannel JSON error: $e');
+    }
+  }
 
   @override
   void initState() {
@@ -56,15 +94,7 @@ class _MiSaludProWebViewState extends State<MiSaludProWebView> {
       ..addJavaScriptChannel(
         'FlutterChannel',
         onMessageReceived: (JavaScriptMessage msg) {
-          // React sends 'back' when user wants to close a full-screen overlay
-          if (msg.message == 'back') {
-            if (mounted) {
-              // Dispatch a custom DOM event that React listens to
-              _controller.runJavaScript(
-                "window.dispatchEvent(new CustomEvent('flutter-back'));",
-              );
-            }
-          }
+          _handleFlutterChannelMessage(msg.message);
         },
       )
       ..setNavigationDelegate(

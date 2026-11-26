@@ -13,7 +13,7 @@ interface RouteMapViewProps {
 }
 
 const TILE_URLS: Record<'dark' | 'satellite', string> = {
-  dark: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  dark: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
   satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
 };
 
@@ -58,10 +58,12 @@ export function RouteMapView({
     routeLayerRef.current = routeGroup;
 
     // Ensure Leaflet recalculates size inside flex/modal containers
-    const timer = window.setTimeout(() => map.invalidateSize(), 120);
+    const timer1 = window.setTimeout(() => map.invalidateSize(), 120);
+    const timer2 = window.setTimeout(() => map.invalidateSize(), 380);
 
     return () => {
-      window.clearTimeout(timer);
+      window.clearTimeout(timer1);
+      window.clearTimeout(timer2);
       map.remove();
       mapRef.current = null;
       tileLayerRef.current = null;
@@ -154,11 +156,18 @@ export function RouteMapView({
     }
 
     // Camera positioning
+    map.invalidateSize();
     if (isLive && center) {
       map.panTo([center.lat, center.lng], { animate: true });
     } else if (points.length >= 2) {
       const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number]));
       map.fitBounds(bounds, { padding: [44, 44], maxZoom: 17 });
+      window.setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize();
+          mapRef.current.fitBounds(bounds, { padding: [44, 44], maxZoom: 17 });
+        }
+      }, 220);
     } else if (center) {
       map.setView([center.lat, center.lng], 16);
     }

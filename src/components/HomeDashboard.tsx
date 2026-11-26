@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  AlarmClock,
   ArrowDown,
   ArrowUp,
   Calendar,
@@ -9,18 +10,21 @@ import {
   Droplets,
   Dumbbell,
   Flame,
+  Footprints,
   HeartPulse,
   Moon,
   Play,
   Plus,
   Sparkles,
   TrendingUp,
+  Utensils,
   WifiOff,
   X,
 } from 'lucide-react';
 import {
   BodyMeasurement,
   DailyHabits,
+  ReminderSettings,
   TabId,
   UserProfile,
   WorkoutSessionLog,
@@ -54,6 +58,9 @@ interface HomeDashboardProps {
   onLaunchOutdoorRun: () => void;
   todayDate?: string;
   workoutSessions?: WorkoutSessionLog[];
+  nutritionTotals?: { calories: number; proteinG: number; carbsG: number; fatG: number };
+  kegelCount?: number;
+  reminders?: ReminderSettings;
   onAddManualSession?: (
     routineId: string,
     routineTitle: string,
@@ -61,6 +68,7 @@ interface HomeDashboardProps {
     caloriesBurned: number,
     extra?: Partial<WorkoutSessionLog>
   ) => WorkoutSessionLog;
+  onDeleteSession?: (sessionId: string) => void;
 }
 
 export function HomeDashboard({
@@ -84,7 +92,11 @@ export function HomeDashboard({
   onLaunchOutdoorRun,
   todayDate,
   workoutSessions = [],
+  nutritionTotals = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
+  kegelCount = 0,
+  reminders,
   onAddManualSession,
+  onDeleteSession,
 }: HomeDashboardProps) {
   const [quickModal, setQuickModal] = useState<'weight' | 'waist' | null>(null);
   const currentWeight = latestMeasurement?.weightKg ?? profile.initialWeightKg;
@@ -326,6 +338,7 @@ export function HomeDashboard({
           sessions={workoutSessions}
           todayDate={todayDate}
           onAddManualSession={onAddManualSession}
+          onDeleteSession={onDeleteSession}
         />
       )}
 
@@ -580,6 +593,164 @@ export function HomeDashboard({
             <span className="w-2 h-2 rounded-full bg-[#38BDF8]" />
             14+d
           </span>
+        </div>
+      </div>
+
+      {/* 6 Interactive Widgets Grid */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between px-0.5">
+          <h2 className="font-display text-sm font-bold text-white">Tus Widgets</h2>
+          <span className="text-[11px] text-[#8E9D93]">6 widgets activos</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Widget 1: Sueño y Alarma */}
+          <button
+            type="button"
+            onClick={onOpenHealthModule}
+            className="text-left rounded-2xl bg-[#131A16] border border-white/8 hover:border-[#D6A63A]/45 p-3.5 space-y-2 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-[#D6A63A] flex items-center gap-1">
+                <Moon className="w-3.5 h-3.5" />
+                <span>Sueño</span>
+              </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#D6A63A]/15 text-[#F6D377] font-mono-nums">
+                {reminders?.wakeUpTime || '06:30'}
+              </span>
+            </div>
+            <p className="font-mono-nums text-xl font-bold text-white">
+              {habits.sleepHours} <span className="text-xs font-normal text-[#9AA89E]">h</span>
+            </p>
+            <p className="text-[10px] text-[#8E9D93] flex items-center gap-1 truncate">
+              <AlarmClock className="w-3 h-3 text-[#D6A63A] shrink-0" />
+              <span>
+                {(reminders?.wakeUpEnabled ?? true) ? 'Alarma iPhone activa' : 'Alarma apagada'}
+              </span>
+            </p>
+          </button>
+
+          {/* Widget 2: Hidratación rápida */}
+          <div className="rounded-2xl bg-[#131A16] border border-white/8 p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={onOpenHealthModule}
+                className="text-[11px] font-semibold text-[#4CC9B0] flex items-center gap-1 cursor-pointer"
+              >
+                <Droplets className="w-3.5 h-3.5" />
+                <span>Agua</span>
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateHabit({
+                    waterLiters: Number(Math.min(6, habits.waterLiters + 0.25).toFixed(2)),
+                  })
+                }
+                className="px-1.5 py-0.5 rounded-md bg-[#4CC9B0]/18 text-[#4CC9B0] text-[10px] font-bold cursor-pointer"
+              >
+                +250ml
+              </button>
+            </div>
+            <p className="font-mono-nums text-xl font-bold text-white">
+              {habits.waterLiters.toFixed(1)}{' '}
+              <span className="text-xs font-normal text-[#9AA89E]">
+                / {profile.waterTargetLiters}L
+              </span>
+            </p>
+            <div className="h-1.5 rounded-full bg-[#1C2620] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[#4CC9B0] transition-all"
+                style={{
+                  width: `${Math.min(100, (habits.waterLiters / Math.max(0.5, profile.waterTargetLiters)) * 100)}%`,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Widget 3: Calorías y Macros */}
+          <button
+            type="button"
+            onClick={() => onNavigateTab('nutricion')}
+            className="text-left rounded-2xl bg-[#131A16] border border-white/8 hover:border-[#FB5262]/45 p-3.5 space-y-1.5 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-[#FB5262] flex items-center gap-1">
+                <Utensils className="w-3.5 h-3.5" />
+                <span>Calorías</span>
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-[#6E7C73]" />
+            </div>
+            <p className="font-mono-nums text-xl font-bold text-white">
+              {Math.round(nutritionTotals.calories)}{' '}
+              <span className="text-xs font-normal text-[#9AA89E]">kcal</span>
+            </p>
+            <p className="text-[10px] font-mono-nums text-[#8E9D93] truncate">
+              P {Math.round(nutritionTotals.proteinG)}g · C {Math.round(nutritionTotals.carbsG)}g · G{' '}
+              {Math.round(nutritionTotals.fatG)}g
+            </p>
+          </button>
+
+          {/* Widget 4: Racha Activa */}
+          <button
+            type="button"
+            onClick={() => onNavigateTab('estadisticas')}
+            className="text-left rounded-2xl bg-[#131A16] border border-white/8 hover:border-[#FF6B2C]/45 p-3.5 space-y-1.5 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-[#FF6B2C] flex items-center gap-1">
+                <Flame className="w-3.5 h-3.5" />
+                <span>Racha</span>
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-[#6E7C73]" />
+            </div>
+            <p className="font-mono-nums text-xl font-bold text-white">
+              {streaks.overall.days}{' '}
+              <span className="text-xs font-normal text-[#9AA89E]">
+                {streaks.overall.days === 1 ? 'día' : 'días'}
+              </span>
+            </p>
+            <p className="text-[10px] text-[#8E9D93] truncate">
+              {streaks.overall.completedToday ? 'Meta diaria cumplida hoy' : '2 hábitos = +1 día'}
+            </p>
+          </button>
+
+          {/* Widget 5: Carrera GPS */}
+          <button
+            type="button"
+            onClick={onLaunchOutdoorRun}
+            className="text-left rounded-2xl bg-[#131A16] border border-white/8 hover:border-[#74D834]/45 p-3.5 space-y-1.5 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-[#74D834] flex items-center gap-1">
+                <Footprints className="w-3.5 h-3.5" />
+                <span>Carrera GPS</span>
+              </span>
+              <Play className="w-3.5 h-3.5 text-[#74D834] fill-current" />
+            </div>
+            <p className="font-display text-sm font-bold text-white">Iniciar ruta</p>
+            <p className="text-[10px] text-[#8E9D93] truncate">Mapa, distancia y ritmo</p>
+          </button>
+
+          {/* Widget 6: Suelo Pélvico (Kegel) */}
+          <button
+            type="button"
+            onClick={onOpenHealthModule}
+            className="text-left rounded-2xl bg-[#131A16] border border-white/8 hover:border-[#3FC8FF]/45 p-3.5 space-y-1.5 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-[#3FC8FF] flex items-center gap-1">
+                <HeartPulse className="w-3.5 h-3.5" />
+                <span>Kegel</span>
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-[#6E7C73]" />
+            </div>
+            <p className="font-mono-nums text-xl font-bold text-white">
+              {kegelCount} <span className="text-xs font-normal text-[#9AA89E]">ses.</span>
+            </p>
+            <p className="text-[10px] text-[#8E9D93] truncate">Guía 10 ciclos · Audio</p>
+          </button>
         </div>
       </div>
 

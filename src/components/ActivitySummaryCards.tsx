@@ -13,12 +13,14 @@ interface ActivitySummaryCardsProps {
     caloriesBurned: number,
     extra?: Partial<WorkoutSessionLog>
   ) => WorkoutSessionLog;
+  onDeleteSession?: (sessionId: string) => void;
 }
 
 export function ActivitySummaryCards({
   sessions,
   todayDate,
   onAddManualSession,
+  onDeleteSession,
 }: ActivitySummaryCardsProps) {
   const [showSessionsModal, setShowSessionsModal] = useState(false);
 
@@ -171,6 +173,7 @@ export function ActivitySummaryCards({
           todayDate={todayDate}
           onClose={() => setShowSessionsModal(false)}
           onAddManualSession={onAddManualSession}
+          onDeleteSession={onDeleteSession}
         />
       )}
     </>

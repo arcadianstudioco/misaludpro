@@ -67,6 +67,7 @@ export interface DailyHabits {
   waterLiters: number;
   sleepHours: number;
   kegelDone: boolean;
+  bedtimeStartedAt?: string;
 }
 
 export interface ExerciseStep {
@@ -172,6 +173,8 @@ export interface ReminderSettings {
   kegelTime: string;
   sleepEnabled: boolean;
   sleepTime: string;
+  wakeUpEnabled?: boolean;
+  wakeUpTime?: string;
 }
 
 export interface AppState {

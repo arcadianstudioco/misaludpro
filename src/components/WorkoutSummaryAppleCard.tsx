@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronRight, Map as MapIcon, Share2, Smartphone, X } from 'lucide-react';
+import { ChevronRight, Map as MapIcon, Share2, Smartphone, Trash2, X } from 'lucide-react';
 import { WorkoutSessionLog } from '../types/health';
 import { RouteMapView } from './RouteMapView';
 import { formatPacePerKm, formatStopwatchDuration } from '../utils/gpsMath';
@@ -7,11 +7,13 @@ import { formatPacePerKm, formatStopwatchDuration } from '../utils/gpsMath';
 interface WorkoutSummaryAppleCardProps {
   session: WorkoutSessionLog;
   onClose: () => void;
+  onDelete?: () => void;
 }
 
 export function WorkoutSummaryAppleCard({
   session,
   onClose,
+  onDelete,
 }: WorkoutSummaryAppleCardProps) {
   const [mapStyle, setMapStyle] = useState<'dark' | 'satellite'>('dark');
   const [unit, setUnit] = useState<'MI' | 'KM'>('MI');
@@ -106,8 +108,24 @@ export function WorkoutSummaryAppleCard({
             >
               <Share2 className="w-4.5 h-4.5" />
             </button>
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                aria-label="Eliminar sesión"
+                className="w-10 h-10 rounded-full bg-[#1C2430]/85 border border-[#E53935]/40 flex items-center justify-center text-[#FF6B6B] hover:bg-[#E53935] hover:text-white cursor-pointer"
+              >
+                <Trash2 className="w-4.5 h-4.5" />
+              </button>
+            )}
           </div>
         </div>
+
+        {(!session.routePoints || session.routePoints.length < 2) && (
+          <div className="absolute left-4 bottom-5 z-10 px-3 py-1 rounded-full bg-black/70 border border-white/15 text-[11px] text-[#C5D0C8]">
+            Sesión sin trazo GPS · Registro manual
+          </div>
+        )}
 
         {sharedToast && (
           <div className="absolute right-4 px-3 py-1 rounded-full bg-[#9CE819] text-black text-[11px] font-semibold"

@@ -27,6 +27,7 @@ import { HealthHabitsView } from './components/HealthHabitsView';
 import { ProfileView } from './components/ProfileView';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator';
 import { exportHealthPlanPdf } from './utils/pdfPlanExport';
+import { syncNativeAlarms } from './utils/nativeAlarms';
 import { useTheme } from './hooks/useTheme';
 
 const NAV_ITEMS: {
@@ -70,6 +71,7 @@ export default function App() {
     dailyNotes,
     saveDailyNote,
     completeWorkoutSession,
+    deleteWorkoutSession,
     toggleRoutineInMyList,
     addMeal,
     toggleMealCompleted,
@@ -209,6 +211,12 @@ export default function App() {
           time: r.sleepTime,
           message: '🌙 Hora recomendada de descanso para recuperar energía (7–9 h).',
         },
+        {
+          id: 'wakeup',
+          enabled: r.wakeUpEnabled ?? true,
+          time: r.wakeUpTime || '06:30',
+          message: '⏰ ¡Buenos días! Hora de despertar y registrar tu descanso.',
+        },
       ];
 
       for (const item of checks) {
@@ -240,6 +248,12 @@ export default function App() {
     const intervalId = window.setInterval(checkReminders, 10000);
     return () => window.clearInterval(intervalId);
   }, [state, today]);
+
+  // Keep native iOS UNUserNotificationCenter alarms synced with reminders
+  useEffect(() => {
+    if (!state || !state.isAuthenticated) return;
+    syncNativeAlarms(state.reminders);
+  }, [state?.isAuthenticated, state?.reminders]);
 
   const isAuthenticated = Boolean(state && state.isAuthenticated);
   const currentWeightKg =
@@ -287,8 +301,10 @@ export default function App() {
           habits={todayHabits}
           streaks={habitStreaks}
           kegelSessions={state.kegelSessions}
+          reminders={state.reminders}
           onBack={() => setShowHealthSubView(false)}
           onUpdateHabit={updateHabit}
+          onUpdateReminders={updateReminders}
           onRecordKegel={recordKegelSession}
         />
       );
@@ -375,7 +391,11 @@ export default function App() {
             }}
             todayDate={today}
             workoutSessions={state.workoutSessions}
+            nutritionTotals={nutritionTotals}
+            kegelCount={state.kegelSessions.length}
+            reminders={state.reminders}
             onAddManualSession={completeWorkoutSession}
+            onDeleteSession={deleteWorkoutSession}
           />
         )}
 
@@ -428,6 +448,7 @@ export default function App() {
             calorieTargetMin={state.profile.calorieTargetMin}
             calorieTargetMax={state.profile.calorieTargetMax}
             onAddManualSession={completeWorkoutSession}
+            onDeleteSession={deleteWorkoutSession}
           />
         )}
 

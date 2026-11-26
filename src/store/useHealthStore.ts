@@ -907,6 +907,17 @@ export function useHealthStore() {
     [today]
   );
 
+  const deleteWorkoutSession = useCallback((sessionId: string) => {
+    setState((prev) => {
+      if (!prev) return prev;
+      const nextSessions = prev.workoutSessions.filter((s) => s.id !== sessionId);
+      return {
+        ...prev,
+        workoutSessions: nextSessions,
+      };
+    });
+  }, []);
+
   const toggleRoutineInMyList = useCallback((routineId: string) => {
     setState((prev) => {
       if (!prev) return prev;
@@ -1164,6 +1175,7 @@ export function useHealthStore() {
     dailyNotes,
     saveDailyNote,
     completeWorkoutSession,
+    deleteWorkoutSession,
     toggleRoutineInMyList,
     addMeal,
     toggleMealCompleted,

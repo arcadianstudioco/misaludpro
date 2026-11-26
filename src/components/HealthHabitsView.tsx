@@ -1,29 +1,41 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  AlarmClock,
   ArrowLeft,
+  BedDouble,
+  BellRing,
   CheckCircle2,
   Droplets,
+  ExternalLink,
   Minus,
   Moon,
   Pause,
   Play,
   Plus,
   RotateCcw,
+  Sun,
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { DailyHabits, KegelSessionLog, UserProfile } from '../types/health';
+import { DailyHabits, KegelSessionLog, ReminderSettings, UserProfile } from '../types/health';
 import { AllHabitStreaks } from '../utils/habitStreaks';
 import { StreakBadge } from './StreakBadge';
 import { playPhaseCue } from '../utils/audioCues';
+import {
+  openNativeClockApp,
+  requestNativeAlarmPermission,
+  syncNativeAlarms,
+} from '../utils/nativeAlarms';
 
 interface HealthHabitsViewProps {
   profile: UserProfile;
   habits: DailyHabits;
   streaks: AllHabitStreaks;
   kegelSessions: KegelSessionLog[];
+  reminders: ReminderSettings;
   onBack: () => void;
   onUpdateHabit: (patch: Partial<DailyHabits>) => void;
+  onUpdateReminders: (patch: Partial<ReminderSettings>) => void;
   onRecordKegel: (cycles: number, holdSec: number, relaxSec: number) => void;
 }
 
@@ -32,8 +44,10 @@ export function HealthHabitsView({
   habits,
   streaks,
   kegelSessions,
+  reminders,
   onBack,
   onUpdateHabit,
+  onUpdateReminders,
   onRecordKegel,
 }: HealthHabitsViewProps) {
   const holdSeconds = 5;
@@ -46,6 +60,82 @@ export function HealthHabitsView({
   const [cycle, setCycle] = useState(1);
   const [completedBanner, setCompletedBanner] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [alarmStatusMsg, setAlarmStatusMsg] = useState<string | null>(null);
+
+  const wakeTime = reminders.wakeUpTime || '06:30';
+  const wakeEnabled = reminders.wakeUpEnabled ?? true;
+  const sleepTime = reminders.sleepTime || '22:30';
+
+  const sleepCycleInfo = useMemo(() => {
+    const [sh, sm] = sleepTime.split(':').map(Number);
+    const [wh, wm] = wakeTime.split(':').map(Number);
+    if (!Number.isFinite(sh) || !Number.isFinite(wh)) {
+      return { hours: 8, cycles: 5 };
+    }
+    let startMin = sh * 60 + (sm || 0);
+    let endMin = wh * 60 + (wm || 0);
+    if (endMin <= startMin) endMin += 24 * 60;
+    const totalHours = (endMin - startMin) / 60;
+    const cycles = Math.round(((endMin - startMin) / 90) * 10) / 10;
+    return {
+      hours: Number(totalHours.toFixed(1)),
+      cycles,
+    };
+  }, [sleepTime, wakeTime]);
+
+  useEffect(() => {
+    const onNativeAlarmStatus = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ granted?: boolean }>).detail;
+      if (detail?.granted) {
+        syncNativeAlarms(reminders);
+        setAlarmStatusMsg(`Alarma programada en iPhone a las ${wakeTime} (suena aunque la app esté cerrada).`);
+      } else {
+        setAlarmStatusMsg('Activa las notificaciones en Ajustes > Mi Salud Pro para que suene la alarma.');
+      }
+    };
+    window.addEventListener('flutter-alarm-status', onNativeAlarmStatus);
+    return () => window.removeEventListener('flutter-alarm-status', onNativeAlarmStatus);
+  }, [reminders, wakeTime]);
+
+  const handleActivateIphoneAlarm = () => {
+    const nextReminders: ReminderSettings = {
+      ...reminders,
+      sleepEnabled: true,
+      sleepTime,
+      wakeUpEnabled: true,
+      wakeUpTime: wakeTime,
+    };
+    onUpdateReminders({
+      sleepEnabled: true,
+      sleepTime,
+      wakeUpEnabled: true,
+      wakeUpTime: wakeTime,
+    });
+    const sentNative = requestNativeAlarmPermission();
+    syncNativeAlarms(nextReminders);
+    if (!sentNative) {
+      if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
+        void Notification.requestPermission();
+      }
+      setAlarmStatusMsg(`Alarma guardada: dormir ${sleepTime} · despertar ${wakeTime}.`);
+    }
+  };
+
+  const handleToggleSleepTracker = () => {
+    if (!habits.bedtimeStartedAt) {
+      onUpdateHabit({ bedtimeStartedAt: new Date().toISOString() });
+      setAlarmStatusMsg('Modo descanso iniciado. Al despertar toca "¡Desperté!" para calcular tus horas.');
+    } else {
+      const startMs = new Date(habits.bedtimeStartedAt).getTime();
+      const diffHours = Math.max(0.5, Math.min(14, (Date.now() - startMs) / 3600000));
+      const rounded = Math.round(diffHours * 2) / 2;
+      onUpdateHabit({
+        sleepHours: rounded,
+        bedtimeStartedAt: undefined,
+      });
+      setAlarmStatusMsg(`¡Buenos días! Se registraron ${rounded} h de sueño.`);
+    }
+  };
 
   useEffect(() => {
     if (!isRunning) return;
@@ -174,16 +264,18 @@ export function HealthHabitsView({
         </div>
       </div>
 
-      {/* Sleep Card */}
-      <div className="rounded-3xl bg-[#131A16] border border-white/8 p-4 space-y-3">
+      {/* Sleep & iPhone Alarm Card */}
+      <div className="rounded-3xl bg-[#131A16] border border-white/8 p-4 space-y-3.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-[#D6A63A]/15 text-[#D6A63A] flex items-center justify-center">
               <Moon className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="font-display text-sm font-bold text-white">Sueño</h2>
-              <p className="text-[11px] text-[#9AA89E]">Objetivo: 7–9 h</p>
+              <h2 className="font-display text-sm font-bold text-white">Sueño y Alarma</h2>
+              <p className="text-[11px] text-[#9AA89E]">
+                Recuperación física · Meta: 7–9 h
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -194,15 +286,117 @@ export function HealthHabitsView({
           </div>
         </div>
 
-        <input
-          type="range"
-          min="4"
-          max="10"
-          step="0.5"
-          value={habits.sleepHours || 7}
-          onChange={(e) => onUpdateHabit({ sleepHours: Number(e.target.value) })}
-          className="w-full accent-[#74D834] cursor-pointer"
-        />
+        {/* Bedtime & Wake-up Alarm Schedule */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="rounded-2xl bg-[#0D120F] border border-white/8 p-3 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-[#9AA89E] flex items-center gap-1">
+                <BedDouble className="w-3.5 h-3.5 text-[#A78BFA]" />
+                <span>Dormir</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={reminders.sleepEnabled}
+                onChange={(e) => onUpdateReminders({ sleepEnabled: e.target.checked })}
+                className="accent-[#74D834] w-4 h-4 cursor-pointer"
+                aria-label="Activar aviso para dormir"
+              />
+            </div>
+            <input
+              type="time"
+              value={sleepTime}
+              onChange={(e) => onUpdateReminders({ sleepTime: e.target.value })}
+              className="w-full bg-transparent font-mono-nums text-base font-bold text-white outline-none"
+            />
+          </div>
+
+          <div className="rounded-2xl bg-[#0D120F] border border-white/8 p-3 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-[#9AA89E] flex items-center gap-1">
+                <Sun className="w-3.5 h-3.5 text-[#D6A63A]" />
+                <span>Alarma</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={wakeEnabled}
+                onChange={(e) => onUpdateReminders({ wakeUpEnabled: e.target.checked })}
+                className="accent-[#74D834] w-4 h-4 cursor-pointer"
+                aria-label="Activar alarma de despertar"
+              />
+            </div>
+            <input
+              type="time"
+              value={wakeTime}
+              onChange={(e) => onUpdateReminders({ wakeUpTime: e.target.value })}
+              className="w-full bg-transparent font-mono-nums text-base font-bold text-white outline-none"
+            />
+          </div>
+        </div>
+
+        {/* REM Sleep Cycle Preview */}
+        <div className="rounded-xl bg-[#0D120F]/80 border border-white/6 px-3 py-2 flex items-center justify-between text-[11px]">
+          <span className="text-[#9AA89E]">Descanso estimado</span>
+          <span className="font-mono-nums font-semibold text-[#74D834]">
+            {sleepCycleInfo.hours} h · {sleepCycleInfo.cycles} ciclos REM
+          </span>
+        </div>
+
+        {/* iPhone Alarm Activation & Live Sleep Tracker */}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={handleActivateIphoneAlarm}
+            className="min-h-[40px] px-2.5 rounded-xl bg-[#D6A63A]/18 border border-[#D6A63A]/40 text-[11px] font-semibold text-[#F6D377] flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <BellRing className="w-3.5 h-3.5 shrink-0" />
+            <span>Programar iPhone</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleToggleSleepTracker}
+            className={`min-h-[40px] px-2.5 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
+              habits.bedtimeStartedAt
+                ? 'bg-[#74D834] text-[#081007]'
+                : 'bg-[#1A231D] border border-white/10 text-white'
+            }`}
+          >
+            <AlarmClock className="w-3.5 h-3.5 shrink-0" />
+            <span>{habits.bedtimeStartedAt ? '¡Desperté!' : 'Ir a dormir'}</span>
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => openNativeClockApp()}
+          className="w-full min-h-[34px] rounded-xl bg-[#0D120F] border border-white/8 text-[11px] text-[#9AA89E] hover:text-white flex items-center justify-center gap-1.5 cursor-pointer"
+        >
+          <ExternalLink className="w-3 h-3" />
+          <span>Abrir app Reloj / Alarma de iPhone</span>
+        </button>
+
+        {alarmStatusMsg && (
+          <p className="text-[11px] text-[#74D834] bg-[#74D834]/10 border border-[#74D834]/25 rounded-xl px-3 py-2 leading-relaxed">
+            {alarmStatusMsg}
+          </p>
+        )}
+
+        {/* Manual Hours Slider */}
+        <div className="pt-1">
+          <div className="flex items-center justify-between text-[11px] text-[#8E9D93] mb-1">
+            <span>Ajuste manual de horas dormidas</span>
+            <span className="font-mono-nums text-white font-semibold">{habits.sleepHours} h</span>
+          </div>
+          <input
+            type="range"
+            min="4"
+            max="10"
+            step="0.5"
+            value={habits.sleepHours || 7}
+            onChange={(e) => onUpdateHabit({ sleepHours: Number(e.target.value) })}
+            className="w-full accent-[#74D834] cursor-pointer"
+          />
+        </div>
       </div>
 
       {/* Kegel Trainer */}
