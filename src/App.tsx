@@ -27,7 +27,8 @@ import { HealthHabitsView } from './components/HealthHabitsView';
 import { ProfileView } from './components/ProfileView';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator';
 import { exportHealthPlanPdf } from './utils/pdfPlanExport';
-import { syncNativeAlarms } from './utils/nativeAlarms';
+import { syncNativeAlarms, syncNativeWidgets } from './utils/nativeAlarms';
+import { estimateStepsFromSessions } from './components/SessionsModal';
 import { useTheme } from './hooks/useTheme';
 
 const NAV_ITEMS: {
@@ -92,16 +93,9 @@ export default function App() {
   const [showHealthSubView, setShowHealthSubView] = useState(false);
   const [autoLaunchOutdoor, setAutoLaunchOutdoor] =
     useState<OutdoorActivityType | null>(null);
-  const [gmpQuotaExceeded, setGmpQuotaExceeded] = useState(false);
   const [activeReminderToast, setActiveReminderToast] = useState<string | null>(null);
   const firedRemindersRef = useRef<Set<string>>(new Set());
   const { theme, setTheme } = useTheme();
-
-  useEffect(() => {
-    const onQuota = () => setGmpQuotaExceeded(true);
-    window.addEventListener('gmp-quota-exceeded', onQuota);
-    return () => window.removeEventListener('gmp-quota-exceeded', onQuota);
-  }, []);
 
   // Handle Flutter back-button / iOS swipe-back — close open sub-views
   useEffect(() => {
@@ -254,6 +248,30 @@ export default function App() {
     if (!state || !state.isAuthenticated) return;
     syncNativeAlarms(state.reminders);
   }, [state?.isAuthenticated, state?.reminders]);
+
+  // Keep native iOS WidgetKit widgets synced with live health metrics
+  useEffect(() => {
+    if (!state || !state.isAuthenticated) return;
+    const todaySessions = state.workoutSessions.filter((s) => s.completedAt === today);
+    const stepsToday = estimateStepsFromSessions(todaySessions);
+    const milesToday = Number(
+      todaySessions.reduce((acc, s) => acc + (Number(s.distanceMiles) || 0), 0).toFixed(2)
+    );
+    syncNativeWidgets({
+      stepsToday,
+      milesToday,
+      sessionsToday: todaySessions.length,
+      sleepHours: todayHabits.sleepHours,
+      wakeTime: state.reminders.wakeUpTime || '06:30',
+      wakeEnabled: state.reminders.wakeUpEnabled ?? true,
+      waterLiters: todayHabits.waterLiters,
+      waterTargetLiters: state.profile.waterTargetLiters,
+      caloriesToday: Math.round(nutritionTotals.calories),
+      calorieTargetMax: state.profile.calorieTargetMax,
+      streakDays: habitStreaks.overall.days,
+      goalPercent: dailyGoalPercent,
+    });
+  }, [state, today, todayHabits, habitStreaks.overall.days, nutritionTotals.calories, dailyGoalPercent]);
 
   const isAuthenticated = Boolean(state && state.isAuthenticated);
   const currentWeightKg =
@@ -482,22 +500,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#060807] text-[#F4F7F4]">
-      {gmpQuotaExceeded && (
-        <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs md:text-sm text-center sticky top-0 z-50 shadow-sm">
-          <span>
-            Google Maps Platform quota reached. If you are the app owner, visit{' '}
-            <a
-              href="https://developers.google.com/maps/ai/ai-studio?utm_campaign=gmp_mcp_codeassist_v1_aistudio#quota_exceeded_errors"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline font-semibold text-amber-950 hover:text-amber-800"
-            >
-              maps developer site
-            </a>{' '}
-            for instructions to update your account.
-          </span>
-        </div>
-      )}
       {/* MOBILE NATIVE-STYLE FULLSCREEN (< lg) */}
       <div className="lg:hidden min-h-screen bg-[#0A0D0B] flex flex-col">
         <main

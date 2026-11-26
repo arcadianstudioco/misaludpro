@@ -93,3 +93,22 @@ export function syncNativeAlarms(reminders: ReminderSettings): boolean {
 export function openNativeClockApp(): boolean {
   return postToFlutter({ action: 'openClock' });
 }
+
+export interface NativeWidgetSnapshot {
+  stepsToday: number;
+  milesToday: number;
+  sessionsToday: number;
+  sleepHours: number;
+  wakeTime: string;
+  wakeEnabled: boolean;
+  waterLiters: number;
+  waterTargetLiters: number;
+  caloriesToday: number;
+  calorieTargetMax: number;
+  streakDays: number;
+  goalPercent: number;
+}
+
+export function syncNativeWidgets(snapshot: NativeWidgetSnapshot): boolean {
+  return postToFlutter({ action: 'syncWidgets', widgetData: snapshot });
+}

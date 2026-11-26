@@ -1,6 +1,8 @@
 import Flutter
 import UIKit
 import UserNotifications
+import Security
+import WidgetKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -79,6 +81,34 @@ import UserNotifications
             result(false)
           }
         }
+
+      case "syncWidgets":
+        guard let jsonString = call.arguments as? String,
+              let data = jsonString.data(using: .utf8) else {
+          result(false)
+          return
+        }
+        let dataKey = "misalud_widget_snapshot"
+        if let defaults = UserDefaults(suiteName: "group.com.example.miSaludPro") {
+          defaults.set(jsonString, forKey: dataKey)
+          defaults.synchronize()
+        }
+        // Keychain fallback for Sideloadly / free Apple IDs
+        let delQuery: [String: Any] = [
+          kSecClass as String: kSecClassGenericPassword,
+          kSecAttrAccount as String: dataKey,
+        ]
+        SecItemDelete(delQuery as CFDictionary)
+        let addQuery: [String: Any] = [
+          kSecClass as String: kSecClassGenericPassword,
+          kSecAttrAccount as String: dataKey,
+          kSecValueData as String: data,
+        ]
+        SecItemAdd(addQuery as CFDictionary, nil)
+        if #available(iOS 14.0, *) {
+          WidgetCenter.shared.reloadAllTimelines()
+        }
+        result(true)
 
       default:
         result(FlutterMethodNotImplemented)

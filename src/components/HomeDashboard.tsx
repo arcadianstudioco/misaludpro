@@ -99,6 +99,42 @@ export function HomeDashboard({
   onDeleteSession,
 }: HomeDashboardProps) {
   const [quickModal, setQuickModal] = useState<'weight' | 'waist' | null>(null);
+  const [showWidgetEditor, setShowWidgetEditor] = useState(false);
+
+  const ALL_WIDGET_OPTIONS = [
+    { id: 'sleep', label: 'Sueño y Alarma', desc: 'Horas dormidas y alarma iPhone' },
+    { id: 'water', label: 'Hidratación (+250ml)', desc: 'Progreso y suma rápida' },
+    { id: 'calories', label: 'Calorías y Macros', desc: 'Kcal, P / C / G del día' },
+    { id: 'streak', label: 'Racha Activa', desc: 'Días consecutivos cumplidos' },
+    { id: 'gps', label: 'Carrera GPS', desc: 'Inicio directo de ruta GPS' },
+    { id: 'kegel', label: 'Suelo Pélvico (Kegel)', desc: 'Sesiones y guía de audio' },
+  ] as const;
+
+  const [enabledWidgets, setEnabledWidgets] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('misalud_home_widgets_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return ['sleep', 'water', 'calories', 'streak', 'gps', 'kegel'];
+  });
+
+  const toggleHomeWidget = (id: string) => {
+    setEnabledWidgets((prev) => {
+      const exists = prev.includes(id);
+      const next = exists ? prev.filter((x) => x !== id) : [...prev, id];
+      try {
+        localStorage.setItem('misalud_home_widgets_v1', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
   const currentWeight = latestMeasurement?.weightKg ?? profile.initialWeightKg;
   const currentWaist = latestMeasurement?.waistCm ?? 94;
 
@@ -596,15 +632,23 @@ export function HomeDashboard({
         </div>
       </div>
 
-      {/* 6 Interactive Widgets Grid */}
+      {/* Customizable Interactive Widgets Grid */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between px-0.5">
           <h2 className="font-display text-sm font-bold text-white">Tus Widgets</h2>
-          <span className="text-[11px] text-[#8E9D93]">6 widgets activos</span>
+          <button
+            type="button"
+            onClick={() => setShowWidgetEditor(true)}
+            className="text-[11px] font-semibold text-[#74D834] inline-flex items-center gap-1 hover:underline cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Editar / Agregar</span>
+          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-2.5">
           {/* Widget 1: Sueño y Alarma */}
+          {enabledWidgets.includes('sleep') && (
           <button
             type="button"
             onClick={onOpenHealthModule}
@@ -629,8 +673,10 @@ export function HomeDashboard({
               </span>
             </p>
           </button>
+          )}
 
           {/* Widget 2: Hidratación rápida */}
+          {enabledWidgets.includes('water') && (
           <div className="rounded-2xl bg-[#131A16] border border-white/8 p-3.5 space-y-2">
             <div className="flex items-center justify-between">
               <button
@@ -668,8 +714,10 @@ export function HomeDashboard({
               />
             </div>
           </div>
+          )}
 
           {/* Widget 3: Calorías y Macros */}
+          {enabledWidgets.includes('calories') && (
           <button
             type="button"
             onClick={() => onNavigateTab('nutricion')}
@@ -691,8 +739,10 @@ export function HomeDashboard({
               {Math.round(nutritionTotals.fatG)}g
             </p>
           </button>
+          )}
 
           {/* Widget 4: Racha Activa */}
+          {enabledWidgets.includes('streak') && (
           <button
             type="button"
             onClick={() => onNavigateTab('estadisticas')}
@@ -715,8 +765,10 @@ export function HomeDashboard({
               {streaks.overall.completedToday ? 'Meta diaria cumplida hoy' : '2 hábitos = +1 día'}
             </p>
           </button>
+          )}
 
           {/* Widget 5: Carrera GPS */}
+          {enabledWidgets.includes('gps') && (
           <button
             type="button"
             onClick={onLaunchOutdoorRun}
@@ -732,8 +784,10 @@ export function HomeDashboard({
             <p className="font-display text-sm font-bold text-white">Iniciar ruta</p>
             <p className="text-[10px] text-[#8E9D93] truncate">Mapa, distancia y ritmo</p>
           </button>
+          )}
 
           {/* Widget 6: Suelo Pélvico (Kegel) */}
+          {enabledWidgets.includes('kegel') && (
           <button
             type="button"
             onClick={onOpenHealthModule}
@@ -751,8 +805,72 @@ export function HomeDashboard({
             </p>
             <p className="text-[10px] text-[#8E9D93] truncate">Guía 10 ciclos · Audio</p>
           </button>
+          )}
         </div>
       </div>
+
+      {/* Modal: Agregar o quitar Widgets en Inicio */}
+      {showWidgetEditor && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl bg-[#141C17] border border-white/10 p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-display text-base font-bold text-white">
+                  Personalizar Widgets
+                </h3>
+                <p className="text-[11px] text-[#8E9D93]">
+                  Activa o desactiva widgets en tu pantalla de Inicio
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWidgetEditor(false)}
+                className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center text-[#9AA89E] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {ALL_WIDGET_OPTIONS.map((opt) => {
+                const active = enabledWidgets.includes(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => toggleHomeWidget(opt.id)}
+                    className={`w-full rounded-2xl border p-3 flex items-center justify-between text-left cursor-pointer ${
+                      active
+                        ? 'bg-[#17241B] border-[#74D834]/45'
+                        : 'bg-[#0D120F] border-white/8 opacity-70'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-xs font-bold text-white">{opt.label}</p>
+                      <p className="text-[10px] text-[#8E9D93]">{opt.desc}</p>
+                    </div>
+                    <span
+                      className={`w-6 h-6 rounded-full flex items-center justify-center border ${
+                        active
+                          ? 'bg-[#74D834] border-[#74D834] text-[#081007]'
+                          : 'border-white/20 text-transparent'
+                      }`}
+                    >
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowWidgetEditor(false)}
+              className="w-full py-3 rounded-2xl bg-[#74D834] text-[#081007] font-bold text-sm cursor-pointer"
+            >
+              Listo
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Quick Module Card: Salud y Suelo Pélvico */}
       <button

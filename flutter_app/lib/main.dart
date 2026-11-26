@@ -79,6 +79,11 @@ class _MiSaludProWebViewState extends State<MiSaludProWebView> {
         }
       } else if (action == 'openClock') {
         await _alarmChannel.invokeMethod('openClockApp');
+      } else if (action == 'syncWidgets') {
+        final widgetData = decoded['widgetData'];
+        if (widgetData != null) {
+          await _alarmChannel.invokeMethod('syncWidgets', jsonEncode(widgetData));
+        }
       }
     } catch (e) {
       debugPrint('FlutterChannel JSON error: $e');

@@ -33,13 +33,24 @@ export function ActivitySummaryCards({
     );
     const latest = sorted[0] || null;
 
-    // Visual hourly-style mini bars reflecting today's activity
-    const bars = [14, 14, 14, 14, 14, 14, 14, 14, 14, 14];
+    // Compute mini activity bars from actual sessions across 10 time slots (or duration proportions)
+    const bars = [12, 12, 12, 12, 12, 12, 12, 12, 12, 12];
     if (todayList.length > 0) {
-      bars[3] = 85;
-      bars[4] = 42;
-      bars[6] = todayList.length > 1 ? 72 : 28;
-      bars[7] = 34;
+      const maxDuration = Math.max(60, ...todayList.map((s) => Number(s.durationSec) || 60));
+      todayList.forEach((s, idx) => {
+        // Parse hour from dateTimeLabel if present (e.g., "9:11 a.m." or "14:20"), else spread by index
+        let slot = (idx * 2 + 3) % 10;
+        const match = (s.dateTimeLabel || '').match(/(\d{1,2}):(\d{2})/);
+        if (match) {
+          let h = parseInt(match[1], 10);
+          const lower = (s.dateTimeLabel || '').toLowerCase();
+          if (lower.includes('p.m') && h < 12) h += 12;
+          if (lower.includes('a.m') && h === 12) h = 0;
+          slot = Math.max(0, Math.min(9, Math.floor((h / 24) * 10)));
+        }
+        const pct = Math.max(28, Math.min(96, Math.round(((Number(s.durationSec) || 60) / maxDuration) * 90)));
+        bars[slot] = Math.max(bars[slot], pct);
+      });
     }
 
     return {
