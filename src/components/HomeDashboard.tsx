@@ -23,7 +23,9 @@ import {
   DailyHabits,
   TabId,
   UserProfile,
+  WorkoutSessionLog,
 } from '../types/health';
+import { ActivitySummaryCards } from './ActivitySummaryCards';
 import { BrandLogo, IMAGE_ASSETS, UserAvatarImage } from './BrandLogo';
 import { ProgressRing } from './ProgressRing';
 import { StreakBadge } from './StreakBadge';
@@ -50,6 +52,15 @@ interface HomeDashboardProps {
   onNavigateTab: (tab: TabId) => void;
   onOpenHealthModule: () => void;
   onLaunchOutdoorRun: () => void;
+  todayDate?: string;
+  workoutSessions?: WorkoutSessionLog[];
+  onAddManualSession?: (
+    routineId: string,
+    routineTitle: string,
+    durationSec: number,
+    caloriesBurned: number,
+    extra?: Partial<WorkoutSessionLog>
+  ) => WorkoutSessionLog;
 }
 
 export function HomeDashboard({
@@ -71,6 +82,9 @@ export function HomeDashboard({
   onNavigateTab,
   onOpenHealthModule,
   onLaunchOutdoorRun,
+  todayDate,
+  workoutSessions = [],
+  onAddManualSession,
 }: HomeDashboardProps) {
   const [quickModal, setQuickModal] = useState<'weight' | 'waist' | null>(null);
   const currentWeight = latestMeasurement?.weightKg ?? profile.initialWeightKg;
@@ -305,6 +319,15 @@ export function HomeDashboard({
           </button>
         </div>
       </div>
+
+      {/* Pasos, Distancia y Sesiones (Resumen tipo Fitness ajustado a Mi Salud Pro) */}
+      {onAddManualSession && todayDate && (
+        <ActivitySummaryCards
+          sessions={workoutSessions}
+          todayDate={todayDate}
+          onAddManualSession={onAddManualSession}
+        />
+      )}
 
       {/* Today's Workout Card matching reference Photo 2 */}
       <div>

@@ -19,6 +19,7 @@ import {
   analyzeProgressDiagnosis,
   ProgressDiagnosis,
 } from '../services/aiClient';
+import { ActivitySummaryCards } from './ActivitySummaryCards';
 import {
   CartesianGrid,
   Line,
@@ -55,6 +56,13 @@ interface StatsViewProps {
   onAddPhoto: (label: string, dataUrl: string) => void;
   onDeletePhoto: (photoId: string) => void;
   onSaveDailyNote: (text: string, dateIso?: string) => void;
+  onAddManualSession?: (
+    routineId: string,
+    routineTitle: string,
+    durationSec: number,
+    caloriesBurned: number,
+    extra?: Partial<WorkoutSessionLog>
+  ) => WorkoutSessionLog;
 }
 
 type RangeKey = '7d' | '30d' | '90d' | '1a';
@@ -105,6 +113,7 @@ export function StatsView({
   onAddPhoto,
   onDeletePhoto,
   onSaveDailyNote,
+  onAddManualSession,
 }: StatsViewProps) {
   const [range, setRange] = useState<RangeKey>('30d');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -391,6 +400,15 @@ export function StatsView({
           <span>Registrar</span>
         </button>
       </div>
+
+      {/* Pasos, Distancia y Sesiones */}
+      {onAddManualSession && (
+        <ActivitySummaryCards
+          sessions={workoutSessions}
+          todayDate={todayDate}
+          onAddManualSession={onAddManualSession}
+        />
+      )}
 
       {/* 7d | 30d | 90d | 1a */}
       <div className="grid grid-cols-4 p-1 rounded-xl bg-[#131A16] border border-white/7">

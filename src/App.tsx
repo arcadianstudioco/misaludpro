@@ -373,6 +373,9 @@ export default function App() {
               setActiveTab('rutinas');
               setAutoLaunchOutdoor('Carrera al aire libre');
             }}
+            todayDate={today}
+            workoutSessions={state.workoutSessions}
+            onAddManualSession={completeWorkoutSession}
           />
         )}
 
@@ -424,6 +427,7 @@ export default function App() {
             targetWeightKg={state.profile.targetWeightKg}
             calorieTargetMin={state.profile.calorieTargetMin}
             calorieTargetMax={state.profile.calorieTargetMax}
+            onAddManualSession={completeWorkoutSession}
           />
         )}
 
