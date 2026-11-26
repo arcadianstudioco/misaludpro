@@ -256,9 +256,12 @@ export async function syncStateToServer(appState: AppState): Promise<boolean> {
   // Cloud sync directly to Supabase project
   if (isSupabaseConfigured()) {
     try {
-      void syncAppStateToSupabase(appState);
+      const sbOk = await syncAppStateToSupabase(appState);
+      if (sbOk) {
+        return true;
+      }
     } catch {
-      // Ignore background supabase sync errors
+      // Ignore background supabase sync errors and try fallback
     }
   }
 

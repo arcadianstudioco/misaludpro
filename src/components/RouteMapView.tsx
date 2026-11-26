@@ -13,7 +13,7 @@ interface RouteMapViewProps {
 }
 
 const TILE_URLS: Record<'dark' | 'satellite', string> = {
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  dark: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
   satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
 };
 
@@ -48,7 +48,6 @@ export function RouteMapView({
 
     const tiles = L.tileLayer(TILE_URLS[mapStyle], {
       maxZoom: 19,
-      subdomains: mapStyle === 'dark' ? 'abcd' : '',
       attribution: '&copy; OpenStreetMap',
     }).addTo(map);
 
@@ -80,7 +79,6 @@ export function RouteMapView({
     }
     const nextTiles = L.tileLayer(TILE_URLS[mapStyle], {
       maxZoom: 19,
-      subdomains: mapStyle === 'dark' ? 'abcd' : '',
       attribution: '&copy; OpenStreetMap',
     }).addTo(map);
     tileLayerRef.current = nextTiles;
@@ -168,7 +166,10 @@ export function RouteMapView({
 
   return (
     <div className={className ? `relative ${className}` : 'relative w-full h-full'}>
-      <div ref={containerRef} className="w-full h-full bg-[#1B2432]" />
+      <div
+        ref={containerRef}
+        className={`w-full h-full bg-[#1B2432] ${mapStyle === 'dark' ? 'map-dark-tiles' : ''}`}
+      />
     </div>
   );
 }

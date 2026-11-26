@@ -91,6 +91,10 @@ textarea {
   background: #1B2432 !important;
 }
 
+.map-dark-tiles .leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(92%) saturate(35%);
+}
+
 .leaflet-control-attribution {
   font-size: 9px !important;
   background: rgba(0, 0, 0, 0.45) !important;

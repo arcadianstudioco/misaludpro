@@ -63,6 +63,53 @@ import {
   updateSyncMetadata,
 } from '../services/localPersistence';
 
+function mergeById<T extends { id: string }>(localItems: T[], cloudItems: T[]): T[] {
+  const seen = new Set<string>();
+  const merged: T[] = [];
+  for (const item of localItems) {
+    if (!seen.has(item.id)) {
+      seen.add(item.id);
+      merged.push(item);
+    }
+  }
+  for (const item of cloudItems) {
+    if (!seen.has(item.id)) {
+      seen.add(item.id);
+      merged.push(item);
+    }
+  }
+  return merged;
+}
+
+function mergeOfflineAndCloudState(cloudState: AppState, localState: AppState | null): AppState {
+  if (!localState) return cloudState;
+  const mergedHabits: Record<string, DailyHabits> = { ...(cloudState.habitsByDate || {}) };
+  for (const [date, localH] of Object.entries(localState.habitsByDate || {})) {
+    const cloudH = mergedHabits[date];
+    if (!cloudH) {
+      mergedHabits[date] = localH;
+    } else {
+      mergedHabits[date] = {
+        ...cloudH,
+        workoutDone: cloudH.workoutDone || localH.workoutDone,
+        healthyEatingDone: cloudH.healthyEatingDone || localH.healthyEatingDone,
+        kegelDone: cloudH.kegelDone || localH.kegelDone,
+        waterLiters: Math.max(cloudH.waterLiters || 0, localH.waterLiters || 0),
+        sleepHours: Math.max(cloudH.sleepHours || 0, localH.sleepHours || 0),
+      };
+    }
+  }
+  return {
+    ...cloudState,
+    workoutSessions: mergeById(localState.workoutSessions || [], cloudState.workoutSessions || []),
+    meals: mergeById(localState.meals || [], cloudState.meals || []),
+    measurements: mergeById(localState.measurements || [], cloudState.measurements || []),
+    progressPhotos: mergeById(localState.progressPhotos || [], cloudState.progressPhotos || []),
+    habitsByDate: mergedHabits,
+    dailyNotes: { ...(cloudState.dailyNotes || {}), ...(localState.dailyNotes || {}) },
+  };
+}
+
 const DEMO_STORAGE_KEY = 'mi_salud_pro_state_v1';
 const LOCAL_FALLBACK_STATE_KEY = 'msp_offline_state_backup';
 
@@ -252,7 +299,7 @@ export function useHealthStore() {
 
             const fetched = await fetchAppStateFromSupabase();
             if (fetched.ok && fetched.state && fetched.state.profile && active) {
-              const full: AppState = {
+              const cloudFull: AppState = {
                 ...createFreshUserState({
                   name: authUsr.name,
                   email: authUsr.email,
@@ -268,8 +315,22 @@ export function useHealthStore() {
                 ...fetched.state,
                 isAuthenticated: true,
               };
-              setState(full);
-              await saveLocalState(full, false);
+              const merged = mergeOfflineAndCloudState(cloudFull, cachedState);
+              const hadLocalExtras =
+                initialMeta.pendingChangesCount > 0 ||
+                (cachedState !== null &&
+                  ((cachedState.workoutSessions?.length || 0) > (cloudFull.workoutSessions?.length || 0) ||
+                    (cachedState.meals?.length || 0) > (cloudFull.meals?.length || 0) ||
+                    (cachedState.measurements?.length || 0) > (cloudFull.measurements?.length || 0) ||
+                    (cachedState.progressPhotos?.length || 0) > (cloudFull.progressPhotos?.length || 0)));
+
+              setState(merged);
+              await saveLocalState(merged, hadLocalExtras);
+              if (hadLocalExtras) {
+                void syncStateToServer(merged);
+              }
+            } else if (cachedState && active) {
+              void syncStateToServer(cachedState);
             }
           }
         } catch {
