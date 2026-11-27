@@ -149,6 +149,46 @@ textarea {
   border-color: rgba(255, 255, 255, 0.15);
 }
 
+/* ==========================================================================
+   Apple Animations & Micro-Interactions
+   ========================================================================== */
+@keyframes appleSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes appleFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.apple-slide-up {
+  animation: appleSlideUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.apple-fade-in {
+  animation: appleFadeIn 0.22s ease-out forwards;
+}
+
+.apple-press {
+  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), opacity 0.15s ease;
+}
+
+.apple-press:active {
+  transform: scale(0.97);
+  opacity: 0.92;
+}
+
 html.light ::-webkit-scrollbar-track {
   background: #eef2ee;
 }

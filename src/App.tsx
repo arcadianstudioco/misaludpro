@@ -26,7 +26,8 @@ import { StatsView } from './components/StatsView';
 import { HealthHabitsView } from './components/HealthHabitsView';
 import { ProfileView } from './components/ProfileView';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator';
-import { exportHealthPlanPdf } from './utils/pdfPlanExport';
+import { exportHealthPlanPdf, GeneratedPdfResult } from './utils/pdfPlanExport';
+import { PdfExportModal } from './components/PdfExportModal';
 import { syncNativeAlarms, syncNativeWidgets } from './utils/nativeAlarms';
 import { estimateStepsFromSessions } from './components/SessionsModal';
 import { useTheme } from './hooks/useTheme';
@@ -94,13 +95,16 @@ export default function App() {
   const [autoLaunchOutdoor, setAutoLaunchOutdoor] =
     useState<OutdoorActivityType | null>(null);
   const [activeReminderToast, setActiveReminderToast] = useState<string | null>(null);
+  const [pdfModalResult, setPdfModalResult] = useState<GeneratedPdfResult | null>(null);
   const firedRemindersRef = useRef<Set<string>>(new Set());
   const { theme, setTheme } = useTheme();
 
   // Handle Flutter back-button / iOS swipe-back — close open sub-views
   useEffect(() => {
     const onFlutterBack = () => {
-      if (showHealthSubView) {
+      if (pdfModalResult) {
+        setPdfModalResult(null);
+      } else if (showHealthSubView) {
         setShowHealthSubView(false);
       } else if (activeReminderToast) {
         setActiveReminderToast(null);
@@ -108,7 +112,7 @@ export default function App() {
     };
     window.addEventListener('flutter-back', onFlutterBack);
     return () => window.removeEventListener('flutter-back', onFlutterBack);
-  }, [showHealthSubView, activeReminderToast]);
+  }, [pdfModalResult, showHealthSubView, activeReminderToast]);
 
   // Global left-edge swipe-right gesture (iOS-style back swipe everywhere)
   useEffect(() => {
@@ -284,12 +288,14 @@ export default function App() {
 
   const handleExportPlanPdf = useCallback(() => {
     if (!state) return null;
-    return exportHealthPlanPdf({
+    const res = exportHealthPlanPdf({
       state,
       today,
       latestMeasurement,
       nutritionTotals,
     });
+    setPdfModalResult(res);
+    return res.fileName;
   }, [state, today, latestMeasurement, nutritionTotals]);
 
   const renderMobileScreenContent = () => {
@@ -617,6 +623,15 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Unified Apple Glass PDF Modal with Share & Safe Download */}
+      {pdfModalResult && state && (
+        <PdfExportModal
+          result={pdfModalResult}
+          userName={state.profile.name}
+          onClose={() => setPdfModalResult(null)}
+        />
+      )}
     </div>
   );
 }

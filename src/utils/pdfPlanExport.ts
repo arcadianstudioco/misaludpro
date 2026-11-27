@@ -29,12 +29,21 @@ function sanitizePdfText(text: string): string {
     .replace(/[‘’]/g, "'");
 }
 
+export interface GeneratedPdfResult {
+  fileName: string;
+  blob: Blob;
+  dataUri: string;
+  file: File;
+  totalPages: number;
+  download: () => void;
+}
+
 export function exportHealthPlanPdf({
   state,
   today,
   latestMeasurement,
   nutritionTotals,
-}: ExportPlanParams): string {
+}: ExportPlanParams): GeneratedPdfResult {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -387,6 +396,17 @@ export function exportHealthPlanPdf({
   }
 
   const fileName = `mi-salud-pro-plan-${today}.pdf`;
-  doc.save(fileName);
-  return fileName;
+  const blob = doc.output('blob');
+  const dataUri = doc.output('datauristring');
+  const file = new File([blob], fileName, { type: 'application/pdf' });
+  const download = () => doc.save(fileName);
+
+  return {
+    fileName,
+    blob,
+    dataUri,
+    file,
+    totalPages,
+    download,
+  };
 }
