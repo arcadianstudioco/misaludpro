@@ -1,12 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Calculator,
   Camera,
   Check,
+  ChevronRight,
   FileText,
   Flame,
   Loader2,
   Plus,
+  Search,
   ShoppingBag,
   Sparkles,
   Trash2,
@@ -20,8 +22,7 @@ import {
   ShoppingItem,
   UserProfile,
 } from '../types/health';
-import { FOOD_CATALOG } from '../data/seedData';
-import { MealBowlArtwork } from './BrandLogo';
+import { FOOD_CATALOG, FoodCatalogItem } from '../data/seedData';
 import { ProgressRing } from './ProgressRing';
 
 interface NutritionViewProps {
@@ -51,6 +52,8 @@ interface NutritionViewProps {
 
 const MEAL_SLOTS: MealSlot[] = ['Desayuno', 'Almuerzo', 'Cena', 'Snack'];
 
+type ModalTab = 'catalogo' | 'manual' | 'escanear';
+
 export function NutritionView({
   profile,
   todayMeals: rawTodayMeals,
@@ -71,50 +74,61 @@ export function NutritionView({
     carbsG: Number(rawTotals?.carbsG) || 0,
     fatG: Number(rawTotals?.fatG) || 0,
   };
+
   const calorieTargetMin = Number(profile?.calorieTargetMin) || 1700;
   const calorieTargetMax = Number(profile?.calorieTargetMax) || 2100;
   const proteinTargetG = Number(profile?.proteinTargetG) || 140;
   const carbsTargetG = Number(profile?.carbsTargetG) || 190;
   const fatTargetG = Number(profile?.fatTargetG) || 65;
 
-  const [showAddMeal, setShowAddMeal] = useState(false);
-  const [showShopping, setShowShopping] = useState(false);
-
-  // Manual Calculator State
-  const [calcSlot, setCalcSlot] = useState<MealSlot>('Almuerzo');
-  const [calcName, setCalcName] = useState('');
-  const [calcAutoKcal, setCalcAutoKcal] = useState(true);
-  const [calcPro, setCalcPro] = useState('30');
-  const [calcCarbs, setCalcCarbs] = useState('40');
-  const [calcFat, setCalcFat] = useState('12');
-  const [calcCal, setCalcCal] = useState('388');
-  const [calcSavedToast, setCalcSavedToast] = useState<string | null>(null);
-  const [photoScanning, setPhotoScanning] = useState(false);
-  const [photoScanNote, setPhotoScanNote] = useState<string | null>(null);
-  const [photoScanError, setPhotoScanError] = useState<string | null>(null);
-
-  // Real-Food Routine Catalog Category State
-  const [routineCategory, setRoutineCategory] = useState<MealSlot>('Desayuno');
-  const [routineAddedName, setRoutineAddedName] = useState<string | null>(null);
-
-  // Modal Slot State
-  const [modalSlot, setModalSlot] = useState<MealSlot>('Almuerzo');
-
-  // Shopping List State
-  const [newShopName, setNewShopName] = useState('');
-  const [newShopQty, setNewShopQty] = useState('');
-
-  const avgTarget = Math.round(
-    (calorieTargetMin + calorieTargetMax) / 2
-  );
+  const avgTarget = Math.round((calorieTargetMin + calorieTargetMax) / 2);
+  const remainingKcal = Math.max(0, avgTarget - totals.calories);
   const caloriePercent = Math.min(
     100,
     Math.round((totals.calories / Math.max(800, avgTarget)) * 100)
   );
 
-  const proteinPct = Math.min(100, (totals.proteinG / Math.max(1, proteinTargetG)) * 100);
-  const carbsPct = Math.min(100, (totals.carbsG / Math.max(1, carbsTargetG)) * 100);
-  const fatPct = Math.min(100, (totals.fatG / Math.max(1, fatTargetG)) * 100);
+  const proteinPct = Math.min(100, Math.round((totals.proteinG / Math.max(1, proteinTargetG)) * 100));
+  const carbsPct = Math.min(100, Math.round((totals.carbsG / Math.max(1, carbsTargetG)) * 100));
+  const fatPct = Math.min(100, Math.round((totals.fatG / Math.max(1, fatTargetG)) * 100));
+
+  // Modal Sheet State
+  const [showMealModal, setShowMealModal] = useState(false);
+  const [activeModalTab, setActiveModalTab] = useState<ModalTab>('catalogo');
+  const [selectedSlot, setSelectedSlot] = useState<MealSlot>('Almuerzo');
+  const [showShopping, setShowShopping] = useState(false);
+  const [addedToast, setAddedToast] = useState<string | null>(null);
+
+  // Catalog search & filter
+  const [catalogQuery, setCatalogQuery] = useState('');
+  const [catalogSlotFilter, setCatalogSlotFilter] = useState<MealSlot>('Almuerzo');
+
+  // Manual Calculator state
+  const [calcName, setCalcName] = useState('');
+  const [calcPro, setCalcPro] = useState('30');
+  const [calcCarbs, setCalcCarbs] = useState('40');
+  const [calcFat, setCalcFat] = useState('12');
+  const [calcCal, setCalcCal] = useState('388');
+  const [calcAutoKcal, setCalcAutoKcal] = useState(true);
+
+  // AI Photo Scanner state
+  const [photoScanning, setPhotoScanning] = useState(false);
+  const [photoScanNote, setPhotoScanNote] = useState<string | null>(null);
+  const [photoScanError, setPhotoScanError] = useState<string | null>(null);
+
+  // Shopping state
+  const [newShopName, setNewShopName] = useState('');
+  const [newShopQty, setNewShopQty] = useState('');
+
+  // Handle Flutter / iOS swipe-back
+  useEffect(() => {
+    const onBack = () => {
+      if (showMealModal) setShowMealModal(false);
+      else if (showShopping) setShowShopping(false);
+    };
+    window.addEventListener('flutter-back', onBack);
+    return () => window.removeEventListener('flutter-back', onBack);
+  }, [showMealModal, showShopping]);
 
   const numPro = Math.max(0, Number(calcPro) || 0);
   const numCarbs = Math.max(0, Number(calcCarbs) || 0);
@@ -124,25 +138,7 @@ export function NutritionView({
     ? macroComputedKcal
     : Math.max(0, Math.round(Number(calcCal) || 0));
 
-  const macroCalTotal = Math.max(1, numPro * 4 + numCarbs * 4 + numFat * 9);
-  const proSharePct = Math.round(((numPro * 4) / macroCalTotal) * 100);
-  const carbsSharePct = Math.round(((numCarbs * 4) / macroCalTotal) * 100);
-  const fatSharePct = Math.max(0, 100 - proSharePct - carbsSharePct);
-
-  const routineFoodsForCategory = useMemo(
-    () => FOOD_CATALOG.filter((item) => item.defaultSlot === routineCategory),
-    [routineCategory]
-  );
-
-  const modalFoodsForSlot = useMemo(
-    () => FOOD_CATALOG.filter((item) => item.defaultSlot === modalSlot),
-    [modalSlot]
-  );
-
-  const handleMacroChange = (
-    field: 'pro' | 'carbs' | 'fat',
-    rawValue: string
-  ) => {
+  const handleMacroChange = (field: 'pro' | 'carbs' | 'fat', rawValue: string) => {
     const nextPro = field === 'pro' ? rawValue : calcPro;
     const nextCarbs = field === 'carbs' ? rawValue : calcCarbs;
     const nextFat = field === 'fat' ? rawValue : calcFat;
@@ -153,21 +149,42 @@ export function NutritionView({
 
     if (calcAutoKcal) {
       const kcal = Math.round(
-        (Math.max(0, Number(nextPro) || 0) * 4) +
-        (Math.max(0, Number(nextCarbs) || 0) * 4) +
-        (Math.max(0, Number(nextFat) || 0) * 9)
+        Math.max(0, Number(nextPro) || 0) * 4 +
+          Math.max(0, Number(nextCarbs) || 0) * 4 +
+          Math.max(0, Number(nextFat) || 0) * 9
       );
       setCalcCal(String(kcal));
     }
   };
 
-  const handleCalculatorSubmit = (e: React.FormEvent) => {
+  const handleOpenAddForSlot = (slot: MealSlot, tab: ModalTab = 'catalogo') => {
+    setSelectedSlot(slot);
+    setCatalogSlotFilter(slot);
+    setActiveModalTab(tab);
+    setShowMealModal(true);
+  };
+
+  const handleQuickAddFood = (item: FoodCatalogItem, slot: MealSlot) => {
+    onAddMeal({
+      slot,
+      name: item.name,
+      calories: item.calories,
+      proteinG: item.proteinG,
+      carbsG: item.carbsG,
+      fatG: item.fatG,
+    });
+    setAddedToast(`${item.name} (+${item.calories} kcal)`);
+    window.setTimeout(() => setAddedToast(null), 2000);
+    setShowMealModal(false);
+  };
+
+  const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (effectiveKcal <= 0 && numPro <= 0 && numCarbs <= 0 && numFat <= 0) return;
 
-    const label = calcName.trim() || `Registro rápido · ${calcSlot}`;
+    const label = calcName.trim() || `Registro manual · ${selectedSlot}`;
     onAddMeal({
-      slot: calcSlot,
+      slot: selectedSlot,
       name: label,
       calories: effectiveKcal,
       proteinG: Math.round(numPro),
@@ -176,9 +193,9 @@ export function NutritionView({
     });
 
     setCalcName('');
-    setPhotoScanNote(null);
-    setCalcSavedToast(`${label} (+${effectiveKcal} kcal)`);
-    window.setTimeout(() => setCalcSavedToast(null), 2200);
+    setAddedToast(`${label} (+${effectiveKcal} kcal)`);
+    window.setTimeout(() => setAddedToast(null), 2000);
+    setShowMealModal(false);
   };
 
   const handleMealPhotoScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -198,6 +215,7 @@ export function NutritionView({
       setCalcCal(String(result.calories));
       setCalcAutoKcal(false);
       setPhotoScanNote(`${result.portion} · ${result.confidenceNote}`);
+      setActiveModalTab('manual');
     } catch (err) {
       setPhotoScanError(
         err instanceof Error ? err.message : 'No se pudo analizar la foto del plato.'
@@ -205,22 +223,6 @@ export function NutritionView({
     } finally {
       setPhotoScanning(false);
     }
-  };
-
-  const handleQuickAddRoutineFood = (
-    item: (typeof FOOD_CATALOG)[number],
-    targetSlot: MealSlot
-  ) => {
-    onAddMeal({
-      slot: targetSlot,
-      name: item.name,
-      calories: item.calories,
-      proteinG: item.proteinG,
-      carbsG: item.carbsG,
-      fatG: item.fatG,
-    });
-    setRoutineAddedName(item.name);
-    window.setTimeout(() => setRoutineAddedName(null), 1800);
   };
 
   const handleAddShopSubmit = (e: React.FormEvent) => {
@@ -231,484 +233,392 @@ export function NutritionView({
     setNewShopQty('');
   };
 
-  const remainingKcal = Math.max(0, avgTarget - totals.calories);
+  // Filtered Catalog
+  const filteredCatalog = useMemo(() => {
+    return FOOD_CATALOG.filter((item) => {
+      const matchSlot = item.defaultSlot === catalogSlotFilter;
+      if (!catalogQuery.trim()) return matchSlot;
+      const q = catalogQuery.toLowerCase();
+      return (
+        item.name.toLowerCase().includes(q) ||
+        item.portion.toLowerCase().includes(q)
+      );
+    });
+  }, [catalogSlotFilter, catalogQuery]);
+
+  // Meals grouped by slot
+  const mealsBySlot = useMemo(() => {
+    const map = new Map<MealSlot, MealEntry[]>();
+    for (const slot of MEAL_SLOTS) {
+      map.set(slot, []);
+    }
+    for (const meal of todayMeals) {
+      const list = map.get(meal.slot) || [];
+      list.push(meal);
+      map.set(meal.slot, list);
+    }
+    return map;
+  }, [todayMeals]);
 
   return (
-    <div className="space-y-4 pb-4">
+    <div className="space-y-4 pb-6">
+      {/* Top Header */}
       <div className="flex items-center justify-between pt-1">
-        <h1 className="font-display text-2xl font-bold text-white">Nutrición</h1>
+        <div>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight text-white">
+            Nutrición
+          </h1>
+          <p className="text-[11px] text-[#8E9D93] font-medium">
+            Balance de calorías y macros
+          </p>
+        </div>
+
         <div className="flex items-center gap-2">
           {onExportPdf && (
             <button
               type="button"
               onClick={() => onExportPdf()}
-              aria-label="Exportar plan en PDF"
-              className="min-h-[40px] px-3 rounded-xl bg-[#131A16] border border-white/8 text-xs font-medium text-[#D2DDD5] inline-flex items-center gap-1.5 cursor-pointer hover:border-[#74D834]/40"
+              aria-label="Exportar PDF"
+              className="apple-glass-pill min-h-[38px] px-3 rounded-2xl text-xs font-semibold text-[#D2DDD5] inline-flex items-center gap-1.5 cursor-pointer transition-all"
             >
-              <FileText className="w-4 h-4 text-[#74D834]" />
+              <FileText className="w-3.5 h-3.5 text-[#74D834]" />
               <span>PDF</span>
             </button>
           )}
+
           <button
             type="button"
             onClick={() => setShowShopping(true)}
-            className="min-h-[40px] px-3 rounded-xl bg-[#131A16] border border-white/8 text-xs font-medium text-[#D2DDD5] inline-flex items-center gap-1.5 cursor-pointer"
+            aria-label="Lista de compras"
+            className="apple-glass-pill min-h-[38px] px-3.5 rounded-2xl text-xs font-semibold text-[#D2DDD5] inline-flex items-center gap-1.5 cursor-pointer transition-all relative"
           >
-            <ShoppingBag className="w-4 h-4 text-[#74D834]" />
+            <ShoppingBag className="w-3.5 h-3.5 text-[#74D834]" />
             <span>Compras</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Tu plan de hoy */}
-      <div className="rounded-3xl bg-[#131A16] border border-white/8 p-3.5 space-y-3.5">
-        <MealBowlArtwork />
-
-        <div className="flex items-center justify-between gap-3 px-1">
-          <div>
-            <h2 className="font-display text-base font-bold text-white">
-              Tu plan de hoy
-            </h2>
-            <p className="text-[11px] text-[#9AA89E] mt-1">
-              Consumido: <span className="text-white font-semibold tabular-nums">{totals.calories.toLocaleString('es-ES')}</span> kcal · Restan{' '}
-              <span className="text-[#74D834] font-semibold tabular-nums">{remainingKcal.toLocaleString('es-ES')}</span>
-            </p>
-            <p className="font-display text-sm font-bold text-white mt-0.5 tabular-nums">
-              Meta: {calorieTargetMin.toLocaleString('es-ES')} –{' '}
-              {calorieTargetMax.toLocaleString('es-ES')} kcal
-            </p>
-          </div>
-          <ProgressRing percent={caloriePercent} size={78} strokeWidth={7} />
-        </div>
-      </div>
-
-      {/* Macro Bars */}
-      <div className="rounded-3xl bg-[#131A16] border border-white/8 p-4 space-y-3.5">
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-medium text-white">Proteínas</span>
-            <span className="font-mono-nums text-[#C5D0C8]">
-              {totals.proteinG} / {proteinTargetG} g
-            </span>
-          </div>
-          <div className="h-2 rounded-full bg-[#1E2721] overflow-hidden">
-            <div
-              className="h-full rounded-full bg-[#74D834] transition-all duration-500"
-              style={{ width: `${proteinPct}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-medium text-white">Carbohidratos</span>
-            <span className="font-mono-nums text-[#C5D0C8]">
-              {totals.carbsG} / {carbsTargetG} g
-            </span>
-          </div>
-          <div className="h-2 rounded-full bg-[#1E2721] overflow-hidden">
-            <div
-              className="h-full rounded-full bg-[#D6A63A] transition-all duration-500"
-              style={{ width: `${carbsPct}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-medium text-white">Grasas</span>
-            <span className="font-mono-nums text-[#C5D0C8]">
-              {totals.fatG} / {fatTargetG} g
-            </span>
-          </div>
-          <div className="h-2 rounded-full bg-[#1E2721] overflow-hidden">
-            <div
-              className="h-full rounded-full bg-[#D87236] transition-all duration-500"
-              style={{ width: `${fatPct}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Calculadora Manual de Registro Rápido */}
-      <form
-        onSubmit={handleCalculatorSubmit}
-        className="rounded-3xl bg-gradient-to-b from-[#151E19] to-[#111713] border border-[#74D834]/25 p-4 space-y-3"
-      >
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-[#74D834]/15 text-[#74D834] flex items-center justify-center shrink-0">
-              <Calculator className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="font-display text-sm font-bold text-white truncate">
-                Calculadora manual
-              </h2>
-              <p className="text-[10px] text-[#9AA89E] truncate">
-                Registro rápido de comidas no listadas
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              const next = !calcAutoKcal;
-              setCalcAutoKcal(next);
-              if (next) setCalcCal(String(macroComputedKcal));
-            }}
-            className={`px-2 py-1 rounded-lg text-[10px] font-semibold border cursor-pointer shrink-0 transition-colors ${
-              calcAutoKcal
-                ? 'bg-[#74D834]/15 border-[#74D834]/40 text-[#74D834]'
-                : 'bg-[#0D120F] border-white/10 text-[#9AA89E]'
-            }`}
-          >
-            {calcAutoKcal ? 'Auto kcal: ON' : 'Kcal manual'}
-          </button>
-        </div>
-
-        {/* Photo Meal Scanner (AI) */}
-        <div className="flex items-center justify-between gap-2 rounded-2xl bg-[#0D120F] border border-[#74D834]/25 p-2.5">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-white flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-[#74D834] shrink-0" />
-              <span>Escanear plato con IA</span>
-            </p>
-            <p className="text-[10px] text-[#8E9D93] truncate">
-              Toma o sube una foto para calcular calorías y macros
-            </p>
-          </div>
-          <label
-            className={`min-h-[36px] px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 ${
-              photoScanning
-                ? 'bg-[#1C261F] text-[#9AA89E] cursor-wait'
-                : 'bg-[#74D834]/18 border border-[#74D834]/40 text-[#74D834] cursor-pointer hover:bg-[#74D834] hover:text-[#081007] transition-colors'
-            }`}
-          >
-            {photoScanning ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Analizando...</span>
-              </>
-            ) : (
-              <>
-                <Camera className="w-3.5 h-3.5" />
-                <span>Foto del plato</span>
-              </>
+            {shoppingList.filter((i) => !i.checked).length > 0 && (
+              <span className="w-4 h-4 rounded-full bg-[#74D834] text-[#081007] text-[10px] font-bold flex items-center justify-center -ml-0.5">
+                {shoppingList.filter((i) => !i.checked).length}
+              </span>
             )}
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              disabled={photoScanning}
-              onChange={(e) => void handleMealPhotoScan(e)}
-              className="hidden"
-            />
-          </label>
+          </button>
         </div>
+      </div>
 
-        {photoScanNote && (
-          <div className="px-3 py-2 rounded-xl bg-[#74D834]/12 border border-[#74D834]/35 text-[11px] text-[#D2DDD5] flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-[#74D834] shrink-0" />
-            <span className="truncate">{photoScanNote}</span>
-          </div>
-        )}
-
-        {photoScanError && (
-          <div className="px-3 py-2 rounded-xl bg-[#E57368]/12 border border-[#E57368]/35 text-[11px] text-[#E57368]">
-            {photoScanError}
-          </div>
-        )}
-
-        {/* Category Selector */}
-        <div className="grid grid-cols-4 gap-1.5">
-          {MEAL_SLOTS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setCalcSlot(s)}
-              className={`min-h-[32px] rounded-xl text-[11px] font-semibold cursor-pointer border transition-colors ${
-                calcSlot === s
-                  ? 'bg-[#74D834] text-[#081007] border-[#74D834]'
-                  : 'bg-[#0D120F] text-[#9AA89E] border-white/8 hover:text-white'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
+      {/* Toast Notification */}
+      {addedToast && (
+        <div className="rounded-2xl bg-[#74D834]/15 border border-[#74D834]/35 px-3.5 py-2.5 flex items-center gap-2 text-xs text-[#74D834] font-medium animate-in fade-in slide-in-from-top duration-200">
+          <Check className="w-4 h-4 stroke-[2.5] shrink-0" />
+          <span className="truncate">{addedToast}</span>
         </div>
+      )}
 
-        {/* Optional Food Name */}
-        <input
-          type="text"
-          value={calcName}
-          onChange={(e) => setCalcName(e.target.value)}
-          placeholder="Nombre (opcional, ej. Tacos de pollo caseros)"
-          className="w-full min-h-[38px] px-3 rounded-xl bg-[#0D120F] border border-white/10 text-xs text-white placeholder:text-[#6B7A70]"
-        />
+      {/* Hero Apple Glass Calorie Card */}
+      <div className="apple-glass-card rounded-[28px] p-4.5 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="space-y-1">
+            <span className="text-[11px] font-semibold tracking-wider uppercase text-[#8E9D93]">
+              Calorías activas
+            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-mono-nums text-3xl font-extrabold text-white tracking-tight">
+                {totals.calories.toLocaleString('es-ES')}
+              </span>
+              <span className="text-xs font-medium text-[#8E9D93]">
+                / {avgTarget.toLocaleString('es-ES')} kcal
+              </span>
+            </div>
 
-        {/* 4 Numeric Inputs: Calorías, Proteínas, Carbohidratos, Grasas */}
-        <div className="grid grid-cols-2 gap-2">
-          <label className="rounded-xl bg-[#0D120F] border border-white/10 p-2.5 flex flex-col gap-1">
-            <span className="text-[10px] font-medium text-[#9AA89E] flex items-center justify-between">
-              <span>Calorías (kcal)</span>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#74D834]/12 border border-[#74D834]/25">
               <Flame className="w-3 h-3 text-[#74D834]" />
-            </span>
-            <input
-              type="number"
-              min="0"
-              inputMode="numeric"
-              value={calcAutoKcal ? macroComputedKcal : calcCal}
-              onChange={(e) => {
-                setCalcAutoKcal(false);
-                setCalcCal(e.target.value);
-              }}
-              className="w-full bg-transparent text-sm font-mono-nums font-bold text-white outline-none"
-            />
-          </label>
-
-          <label className="rounded-xl bg-[#0D120F] border border-[#74D834]/25 p-2.5 flex flex-col gap-1">
-            <span className="text-[10px] font-medium text-[#74D834]">
-              Proteínas (g)
-            </span>
-            <input
-              type="number"
-              min="0"
-              inputMode="numeric"
-              value={calcPro}
-              onChange={(e) => handleMacroChange('pro', e.target.value)}
-              className="w-full bg-transparent text-sm font-mono-nums font-bold text-white outline-none"
-            />
-          </label>
-
-          <label className="rounded-xl bg-[#0D120F] border border-[#D6A63A]/25 p-2.5 flex flex-col gap-1">
-            <span className="text-[10px] font-medium text-[#D6A63A]">
-              Carbohidratos (g)
-            </span>
-            <input
-              type="number"
-              min="0"
-              inputMode="numeric"
-              value={calcCarbs}
-              onChange={(e) => handleMacroChange('carbs', e.target.value)}
-              className="w-full bg-transparent text-sm font-mono-nums font-bold text-white outline-none"
-            />
-          </label>
-
-          <label className="rounded-xl bg-[#0D120F] border border-[#D87236]/25 p-2.5 flex flex-col gap-1">
-            <span className="text-[10px] font-medium text-[#D87236]">
-              Grasas (g)
-            </span>
-            <input
-              type="number"
-              min="0"
-              inputMode="numeric"
-              value={calcFat}
-              onChange={(e) => handleMacroChange('fat', e.target.value)}
-              className="w-full bg-transparent text-sm font-mono-nums font-bold text-white outline-none"
-            />
-          </label>
-        </div>
-
-        {/* Live Macro Breakdown Bar */}
-        <div className="space-y-1.5">
-          <div className="h-1.5 rounded-full bg-[#0D120F] overflow-hidden flex">
-            <div className="h-full bg-[#74D834]" style={{ width: `${proSharePct}%` }} />
-            <div className="h-full bg-[#D6A63A]" style={{ width: `${carbsSharePct}%` }} />
-            <div className="h-full bg-[#D87236]" style={{ width: `${fatSharePct}%` }} />
+              <span className="text-[11px] font-bold text-[#74D834] font-mono-nums">
+                {remainingKcal > 0 ? `${remainingKcal.toLocaleString('es-ES')} kcal restantes` : '¡Meta alcanzada!'}
+              </span>
+            </div>
           </div>
-          <div className="flex items-center justify-between text-[10px] text-[#9AA89E] font-mono-nums">
-            <span>P {proSharePct}% · C {carbsSharePct}% · G {fatSharePct}%</span>
-            <span>
-              4P+4C+9G = <strong className="text-white">{macroComputedKcal}</strong> kcal
-            </span>
+
+          <div className="shrink-0 relative">
+            <ProgressRing percent={caloriePercent} size={82} strokeWidth={8} />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="font-mono-nums text-xs font-extrabold text-white">
+                {caloriePercent}%
+              </span>
+            </div>
           </div>
         </div>
 
-        {calcSavedToast && (
-          <div className="px-3 py-2 rounded-xl bg-[#74D834]/15 border border-[#74D834]/35 text-[11px] text-[#74D834] flex items-center gap-1.5">
-            <Check className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Añadido: {calcSavedToast}</span>
+        {/* 3 Macro Apple Glass Mini-Cards */}
+        <div className="grid grid-cols-3 gap-2 pt-1">
+          {/* Proteína */}
+          <div className="apple-glass-pill rounded-2xl p-2.5 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-[#74D834]">Proteína</span>
+              <span className="text-[9px] font-mono-nums text-[#8E9D93]">{proteinPct}%</span>
+            </div>
+            <p className="font-mono-nums text-sm font-extrabold text-white">
+              {totals.proteinG} <span className="text-[10px] font-normal text-[#8E9D93]">/ {proteinTargetG}g</span>
+            </p>
+            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[#74D834] transition-all duration-500"
+                style={{ width: `${proteinPct}%` }}
+              />
+            </div>
           </div>
-        )}
+
+          {/* Carbos */}
+          <div className="apple-glass-pill rounded-2xl p-2.5 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-[#FF9F0A]">Carbos</span>
+              <span className="text-[9px] font-mono-nums text-[#8E9D93]">{carbsPct}%</span>
+            </div>
+            <p className="font-mono-nums text-sm font-extrabold text-white">
+              {totals.carbsG} <span className="text-[10px] font-normal text-[#8E9D93]">/ {carbsTargetG}g</span>
+            </p>
+            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[#FF9F0A] transition-all duration-500"
+                style={{ width: `${carbsPct}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Grasas */}
+          <div className="apple-glass-pill rounded-2xl p-2.5 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-[#FF453A]">Grasas</span>
+              <span className="text-[9px] font-mono-nums text-[#8E9D93]">{fatPct}%</span>
+            </div>
+            <p className="font-mono-nums text-sm font-extrabold text-white">
+              {totals.fatG} <span className="text-[10px] font-normal text-[#8E9D93]">/ {fatTargetG}g</span>
+            </p>
+            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[#FF453A] transition-all duration-500"
+                style={{ width: `${fatPct}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Action Glass Buttons */}
+      <div className="grid grid-cols-3 gap-2">
+        <button
+          type="button"
+          onClick={() => handleOpenAddForSlot('Almuerzo', 'catalogo')}
+          className="apple-glass-card rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 cursor-pointer text-center group transition-all"
+        >
+          <div className="w-8 h-8 rounded-full bg-[#74D834]/15 border border-[#74D834]/30 flex items-center justify-center text-[#74D834] group-hover:scale-105 transition-transform">
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+          </div>
+          <span className="text-xs font-semibold text-white">Registrar</span>
+        </button>
+
+        <label className="apple-glass-card rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 cursor-pointer text-center group transition-all">
+          <div className="w-8 h-8 rounded-full bg-[#3FC8FF]/15 border border-[#3FC8FF]/30 flex items-center justify-center text-[#3FC8FF] group-hover:scale-105 transition-transform">
+            {photoScanning ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Camera className="w-4 h-4" />
+            )}
+          </div>
+          <span className="text-xs font-semibold text-white">
+            {photoScanning ? 'Analizando...' : 'Escanear IA'}
+          </span>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            disabled={photoScanning}
+            onChange={(e) => void handleMealPhotoScan(e)}
+            className="hidden"
+          />
+        </label>
 
         <button
-          type="submit"
-          className="w-full min-h-[42px] rounded-2xl font-display font-semibold text-xs text-[#081007] bg-gradient-to-r from-[#82E63E] to-[#58C222] flex items-center justify-center gap-1.5 cursor-pointer"
+          type="button"
+          onClick={() => handleOpenAddForSlot('Almuerzo', 'manual')}
+          className="apple-glass-card rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 cursor-pointer text-center group transition-all"
         >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-          <span>Añadir registro rápido ({effectiveKcal} kcal)</span>
+          <div className="w-8 h-8 rounded-full bg-[#A78BFA]/15 border border-[#A78BFA]/30 flex items-center justify-center text-[#A78BFA] group-hover:scale-105 transition-transform">
+            <Calculator className="w-4 h-4" />
+          </div>
+          <span className="text-xs font-semibold text-white">Manual</span>
         </button>
-      </form>
-
-      {/* Comida Real en Rutina por Categoría */}
-      <div className="rounded-3xl bg-[#131A16] border border-white/8 p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <Sparkles className="w-4 h-4 text-[#74D834] shrink-0" />
-            <div className="min-w-0">
-              <h2 className="font-display text-sm font-bold text-white truncate">
-                Comida real en rutina
-              </h2>
-              <p className="text-[10px] text-[#9AA89E]">
-                Opciones naturales por categoría · 1 toque para añadir
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-4 gap-1.5">
-          {MEAL_SLOTS.map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setRoutineCategory(cat)}
-              className={`min-h-[34px] rounded-xl text-[11px] font-semibold cursor-pointer border transition-colors ${
-                routineCategory === cat
-                  ? 'bg-[#74D834] text-[#081007] border-[#74D834]'
-                  : 'bg-[#0D120F] text-[#9AA89E] border-white/8 hover:text-white'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        {routineAddedName && (
-          <div className="px-3 py-1.5 rounded-xl bg-[#74D834]/15 border border-[#74D834]/35 text-[11px] text-[#74D834] flex items-center gap-1.5">
-            <Check className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Añadido a {routineCategory}: {routineAddedName}</span>
-          </div>
-        )}
-
-        <div className="space-y-2">
-          {routineFoodsForCategory.map((item) => (
-            <div
-              key={item.name}
-              className="p-2.5 rounded-2xl bg-[#0D120F] border border-white/7 flex items-center justify-between gap-2.5"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-white leading-snug">
-                  {item.name}
-                </p>
-                <p className="text-[10px] text-[#8E9D93] mt-0.5 truncate">
-                  {item.portion}
-                </p>
-                <p className="text-[10px] text-[#B7C4BB] font-mono-nums mt-1">
-                  <span className="text-[#74D834] font-semibold">{item.calories} kcal</span>
-                  {' · '}P {item.proteinG}g · C {item.carbsG}g · G {item.fatG}g
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleQuickAddRoutineFood(item, routineCategory)}
-                aria-label={`Añadir ${item.name}`}
-                className="min-h-[36px] px-2.5 rounded-xl bg-[#1A241E] border border-[#74D834]/35 text-[11px] font-semibold text-[#74D834] hover:bg-[#74D834] hover:text-[#081007] transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Añadir</span>
-              </button>
-            </div>
-          ))}
-        </div>
       </div>
 
-      {/* Comidas del día */}
-      <div className="space-y-2.5">
+      {/* Comidas del Día (Agrupadas estilo Apple Health) */}
+      <div className="space-y-3 pt-1">
         <div className="flex items-center justify-between px-1">
-          <h2 className="font-display text-sm font-bold text-white">
-            Comidas del día ({todayMeals.length})
+          <h2 className="font-display text-lg font-bold text-white">
+            Comidas registradas ({todayMeals.length})
           </h2>
-          <button
-            type="button"
-            onClick={() => setShowAddMeal(true)}
-            aria-label="Registrar alimento"
-            className="w-10 h-10 rounded-full bg-[#74D834] text-[#081007] flex items-center justify-center cursor-pointer shadow-md shadow-[#74D834]/20"
-          >
-            <Plus className="w-5 h-5 stroke-[2.5]" />
-          </button>
+          <span className="text-[11px] font-mono-nums text-[#8E9D93]">
+            {totals.calories} kcal totales
+          </span>
         </div>
 
-        {todayMeals.length === 0 ? (
-          <div className="rounded-3xl bg-[#131A16] border border-white/7 p-6 text-center space-y-2">
-            <Utensils className="w-7 h-7 text-[#74D834] mx-auto opacity-80" />
-            <p className="text-xs font-medium text-white">Sin comidas registradas hoy</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {todayMeals.map((meal) => (
-              <div
-                key={meal.id}
-                className="rounded-2xl bg-[#131A16] border border-white/7 p-3 flex items-center justify-between gap-2.5"
-              >
-                <button
-                  type="button"
-                  onClick={() => onToggleMeal(meal.id)}
-                  className="flex items-center gap-3 flex-1 text-left cursor-pointer min-w-0"
-                >
-                  <MealBowlArtwork compact />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-display text-xs font-semibold text-white truncate">
-                        {meal.slot}
-                      </span>
-                      {meal.completed && (
-                        <Check className="w-3.5 h-3.5 text-[#74D834] stroke-[3] shrink-0" />
-                      )}
-                      <span className="text-[11px] text-[#74D834] font-mono-nums shrink-0 ml-auto">
-                        {meal.calories} kcal
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[#D2DDD5] truncate mt-0.5">
-                      {meal.name}
-                    </p>
-                    <p className="text-[10px] text-[#849489] font-mono-nums mt-0.5">
-                      P {meal.proteinG}g · C {meal.carbsG}g · G {meal.fatG}g
-                    </p>
-                  </div>
-                </button>
+        <div className="space-y-3">
+          {MEAL_SLOTS.map((slot) => {
+            const meals = mealsBySlot.get(slot) || [];
+            const slotCalories = meals.reduce((sum, m) => sum + (Number(m.calories) || 0), 0);
 
-                <button
-                  type="button"
-                  onClick={() => onDeleteMeal(meal.id)}
-                  aria-label="Eliminar comida"
-                  className="min-h-[36px] min-w-[36px] rounded-xl text-[#6E7D73] hover:text-[#E06A5E] flex items-center justify-center cursor-pointer shrink-0"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+            return (
+              <div key={slot} className="apple-glass-card rounded-3xl p-3.5 space-y-2.5">
+                {/* Slot Header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-display text-sm font-bold text-white">
+                      {slot}
+                    </span>
+                    {slotCalories > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-white/6 text-[10px] font-mono-nums font-semibold text-[#74D834]">
+                        {slotCalories} kcal
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAddForSlot(slot, 'catalogo')}
+                    aria-label={`Añadir a ${slot}`}
+                    className="w-7 h-7 rounded-full bg-white/8 hover:bg-[#74D834] hover:text-[#081007] text-[#C5D0C8] flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </button>
+                </div>
+
+                {/* Meals in this slot */}
+                {meals.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAddForSlot(slot, 'catalogo')}
+                    className="w-full py-2.5 rounded-2xl border border-dashed border-white/10 hover:border-white/20 text-center text-[11px] text-[#6E7C73] hover:text-[#C5D0C8] transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3 text-[#74D834]" />
+                    <span>Sin registrar · Toca para agregar</span>
+                  </button>
+                ) : (
+                  <div className="space-y-1.5">
+                    {meals.map((meal) => (
+                      <div
+                        key={meal.id}
+                        className="apple-glass-pill rounded-2xl p-2.5 flex items-center justify-between gap-2 transition-all"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onToggleMeal(meal.id)}
+                          className="flex items-center gap-2.5 flex-1 min-w-0 text-left cursor-pointer"
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all shrink-0 ${
+                              meal.completed
+                                ? 'bg-[#74D834] border-[#74D834] text-[#081007]'
+                                : 'border-white/20 bg-white/5'
+                            }`}
+                          >
+                            {meal.completed && <Check className="w-3 h-3 stroke-[3]" />}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={`text-xs font-semibold truncate ${
+                                meal.completed ? 'line-through text-[#6E7C73]' : 'text-white'
+                              }`}
+                            >
+                              {meal.name}
+                            </p>
+                            <p className="text-[10px] text-[#8E9D93] font-mono-nums mt-0.5">
+                              <span className="text-[#74D834]">P {meal.proteinG}g</span> ·{' '}
+                              <span className="text-[#FF9F0A]">C {meal.carbsG}g</span> ·{' '}
+                              <span className="text-[#FF453A]">G {meal.fatG}g</span>
+                            </p>
+                          </div>
+                        </button>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-mono-nums text-xs font-bold text-[#74D834]">
+                            {meal.calories} kcal
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteMeal(meal.id)}
+                            aria-label="Eliminar comida"
+                            className="w-7 h-7 rounded-xl text-[#6E7C73] hover:text-[#FF453A] hover:bg-white/5 flex items-center justify-center cursor-pointer transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
 
-      {/* Add Meal Modal (Catalog by Category + Quick Custom) */}
-      {showAddMeal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end justify-center p-3">
-          <div className="w-full rounded-3xl bg-[#141C17] border border-white/10 p-5 space-y-4 max-h-[85%] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-base font-bold text-white">
-                Registrar comida real
-              </h3>
+      {/* Unified Apple Glass Modal: Registrar Comida */}
+      {showMealModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
+          <div className="apple-glass-elevated w-full max-w-md rounded-[32px] p-5 space-y-4 max-h-[88vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-1">
+              <div>
+                <h3 className="font-display text-lg font-bold text-white">
+                  Registrar en {selectedSlot}
+                </h3>
+                <p className="text-[11px] text-[#8E9D93]">
+                  Selecciona del catálogo, cálculo manual o IA
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => setShowAddMeal(false)}
-                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-[#9AA89E] cursor-pointer"
+                onClick={() => setShowMealModal(false)}
+                className="w-8 h-8 rounded-full bg-white/8 hover:bg-white/15 flex items-center justify-center text-[#C5D0C8] hover:text-white cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="grid grid-cols-4 gap-1.5">
+            {/* Apple Segmented Control for Tabs */}
+            <div className="p-1 rounded-2xl bg-black/40 border border-white/8 grid grid-cols-3 gap-1">
+              {(
+                [
+                  { id: 'catalogo', label: 'Catálogo' },
+                  { id: 'manual', label: 'Manual' },
+                  { id: 'escanear', label: 'Escanear IA' },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveModalTab(tab.id)}
+                  className={`py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    activeModalTab === tab.id
+                      ? 'bg-[#74D834] text-[#081007] shadow-sm'
+                      : 'text-[#8E9D93] hover:text-white'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Slot Picker inside Modal */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
               {MEAL_SLOTS.map((s) => (
                 <button
                   key={s}
                   type="button"
-                  onClick={() => setModalSlot(s)}
-                  className={`min-h-[36px] rounded-xl text-[11px] font-semibold cursor-pointer border ${
-                    modalSlot === s
-                      ? 'bg-[#74D834] text-[#081007] border-[#74D834]'
-                      : 'bg-[#0D120F] text-[#9AA89E] border-white/8'
+                  onClick={() => {
+                    setSelectedSlot(s);
+                    setCatalogSlotFilter(s);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold border transition-all shrink-0 cursor-pointer ${
+                    selectedSlot === s
+                      ? 'bg-white/15 border-white/30 text-white'
+                      : 'bg-white/4 border-white/6 text-[#8E9D93]'
                   }`}
                 >
                   {s}
@@ -716,111 +626,278 @@ export function NutritionView({
               ))}
             </div>
 
-            <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-              {modalFoodsForSlot.map((item) => (
-                <button
-                  key={item.name}
-                  type="button"
-                  onClick={() => {
-                    onAddMeal({
-                      slot: modalSlot,
-                      name: item.name,
-                      calories: item.calories,
-                      proteinG: item.proteinG,
-                      carbsG: item.carbsG,
-                      fatG: item.fatG,
-                    });
-                    setShowAddMeal(false);
-                  }}
-                  className="w-full text-left p-2.5 rounded-xl bg-[#0D120F] border border-white/6 hover:border-[#74D834]/50 flex items-center justify-between gap-2 cursor-pointer"
-                >
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-white truncate">{item.name}</p>
-                    <p className="text-[10px] text-[#849489] truncate">{item.portion}</p>
-                    <p className="text-[10px] text-[#8E9D93] tabular-nums mt-0.5">
-                      P {item.proteinG}g · C {item.carbsG}g · G {item.fatG}g
-                    </p>
+            {/* TAB 1: CATÁLOGO */}
+            {activeModalTab === 'catalogo' && (
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search className="w-4 h-4 text-[#8E9D93] absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={catalogQuery}
+                    onChange={(e) => setCatalogQuery(e.target.value)}
+                    placeholder="Buscar comida real (ej. avena, salmón, huevos)..."
+                    className="w-full min-h-[40px] pl-9 pr-3 rounded-2xl bg-black/40 border border-white/10 text-xs text-white placeholder:text-[#6E7C73] outline-none focus:border-[#74D834]/50"
+                  />
+                </div>
+
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {filteredCatalog.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-[#8E9D93]">
+                      No se encontraron alimentos en esta categoría
+                    </div>
+                  ) : (
+                    filteredCatalog.map((item) => (
+                      <div
+                        key={item.name}
+                        onClick={() => handleQuickAddFood(item, selectedSlot)}
+                        className="apple-glass-pill p-3 rounded-2xl flex items-center justify-between gap-3 hover:border-[#74D834]/40 cursor-pointer transition-all"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-white leading-snug">
+                            {item.name}
+                          </p>
+                          <p className="text-[10px] text-[#8E9D93] truncate mt-0.5">
+                            {item.portion}
+                          </p>
+                          <p className="text-[10px] font-mono-nums text-[#8E9D93] mt-1">
+                            <span className="text-[#74D834]">P {item.proteinG}g</span> ·{' '}
+                            <span className="text-[#FF9F0A]">C {item.carbsG}g</span> ·{' '}
+                            <span className="text-[#FF453A]">G {item.fatG}g</span>
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-mono-nums text-sm font-bold text-[#74D834] block">
+                            +{item.calories}
+                          </span>
+                          <span className="text-[9px] text-[#8E9D93]">kcal</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: MANUAL */}
+            {activeModalTab === 'manual' && (
+              <form onSubmit={handleManualSubmit} className="space-y-3.5">
+                <input
+                  type="text"
+                  value={calcName}
+                  onChange={(e) => setCalcName(e.target.value)}
+                  placeholder="Nombre de la comida (ej. Bowl casero de atún)"
+                  className="w-full min-h-[42px] px-3.5 rounded-2xl bg-black/40 border border-white/10 text-xs text-white placeholder:text-[#6E7C73] outline-none focus:border-[#74D834]/50"
+                />
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="apple-glass-pill rounded-2xl p-3 space-y-1">
+                    <span className="text-[10px] font-semibold text-[#74D834]">
+                      Proteínas (g)
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      value={calcPro}
+                      onChange={(e) => handleMacroChange('pro', e.target.value)}
+                      className="w-full bg-transparent font-mono-nums text-base font-bold text-white outline-none"
+                    />
                   </div>
-                  <span className="text-xs font-mono-nums font-semibold text-[#74D834] shrink-0">
-                    +{item.calories}
-                  </span>
+
+                  <div className="apple-glass-pill rounded-2xl p-3 space-y-1">
+                    <span className="text-[10px] font-semibold text-[#FF9F0A]">
+                      Carbohidratos (g)
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      value={calcCarbs}
+                      onChange={(e) => handleMacroChange('carbs', e.target.value)}
+                      className="w-full bg-transparent font-mono-nums text-base font-bold text-white outline-none"
+                    />
+                  </div>
+
+                  <div className="apple-glass-pill rounded-2xl p-3 space-y-1">
+                    <span className="text-[10px] font-semibold text-[#FF453A]">
+                      Grasas (g)
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      value={calcFat}
+                      onChange={(e) => handleMacroChange('fat', e.target.value)}
+                      className="w-full bg-transparent font-mono-nums text-base font-bold text-white outline-none"
+                    />
+                  </div>
+
+                  <div className="apple-glass-pill rounded-2xl p-3 space-y-1">
+                    <span className="text-[10px] font-semibold text-white/80">
+                      Calorías (kcal)
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      value={calcAutoKcal ? macroComputedKcal : calcCal}
+                      onChange={(e) => {
+                        setCalcAutoKcal(false);
+                        setCalcCal(e.target.value);
+                      }}
+                      className="w-full bg-transparent font-mono-nums text-base font-bold text-white outline-none"
+                    />
+                  </div>
+                </div>
+
+                {photoScanNote && (
+                  <div className="p-3 rounded-2xl bg-[#74D834]/12 border border-[#74D834]/30 text-[11px] text-[#D2DDD5] flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#74D834] shrink-0" />
+                    <span>{photoScanNote}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full min-h-[46px] rounded-2xl bg-[#74D834] text-[#081007] font-display font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer hover:bg-[#82E63E] transition-all"
+                >
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>Agregar {effectiveKcal} kcal</span>
                 </button>
-              ))}
-            </div>
+              </form>
+            )}
+
+            {/* TAB 3: ESCANEAR IA */}
+            {activeModalTab === 'escanear' && (
+              <div className="space-y-4 py-2 text-center">
+                <div className="w-16 h-16 rounded-full bg-[#74D834]/15 border border-[#74D834]/30 text-[#74D834] flex items-center justify-center mx-auto">
+                  <Sparkles className="w-8 h-8" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-display text-sm font-bold text-white">
+                    Escaneo inteligente de plato
+                  </h4>
+                  <p className="text-xs text-[#8E9D93] max-w-xs mx-auto">
+                    Apunta con la cámara o selecciona una imagen de tu comida para desglosar calorías y macronutrientes al instante.
+                  </p>
+                </div>
+
+                {photoScanError && (
+                  <div className="p-3 rounded-2xl bg-[#FF453A]/12 border border-[#FF453A]/30 text-xs text-[#FF453A]">
+                    {photoScanError}
+                  </div>
+                )}
+
+                <label className="w-full min-h-[46px] rounded-2xl bg-[#74D834] text-[#081007] font-display font-bold text-xs flex items-center justify-center gap-2 cursor-pointer hover:bg-[#82E63E] transition-all">
+                  {photoScanning ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Analizando comida...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-4 h-4" />
+                      <span>Tomar foto del plato</span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    disabled={photoScanning}
+                    onChange={(e) => void handleMealPhotoScan(e)}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Shopping List Modal */}
+      {/* Shopping List Apple Glass Modal */}
       {showShopping && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end justify-center p-3">
-          <div className="w-full rounded-3xl bg-[#141C17] border border-white/10 p-5 space-y-3.5 max-h-[82%] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-base font-bold text-white">
-                Lista de compras
-              </h3>
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
+          <div className="apple-glass-elevated w-full max-w-md rounded-[32px] p-5 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-1">
+              <div>
+                <h3 className="font-display text-lg font-bold text-white">
+                  Lista de compras
+                </h3>
+                <p className="text-[11px] text-[#8E9D93]">
+                  Ingredientes saludables y compras pendientes
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowShopping(false)}
-                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-[#9AA89E] cursor-pointer"
+                className="w-8 h-8 rounded-full bg-white/8 hover:bg-white/15 flex items-center justify-center text-[#C5D0C8] hover:text-white cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleAddShopSubmit} className="flex gap-1.5">
+            <form onSubmit={handleAddShopSubmit} className="flex gap-2">
               <input
                 type="text"
                 value={newShopName}
                 onChange={(e) => setNewShopName(e.target.value)}
-                placeholder="Ingrediente..."
-                className="flex-1 min-h-[40px] px-3 rounded-xl bg-[#0D120F] border border-white/10 text-xs text-white"
+                placeholder="Ingrediente (ej. Aguacate, Avena)..."
+                className="flex-1 min-h-[42px] px-3.5 rounded-2xl bg-black/40 border border-white/10 text-xs text-white placeholder:text-[#6E7C73] outline-none focus:border-[#74D834]/50"
               />
               <input
                 type="text"
                 value={newShopQty}
                 onChange={(e) => setNewShopQty(e.target.value)}
                 placeholder="Cant."
-                className="w-16 min-h-[40px] px-2 rounded-xl bg-[#0D120F] border border-white/10 text-xs text-white"
+                className="w-18 min-h-[42px] px-2.5 rounded-2xl bg-black/40 border border-white/10 text-xs text-white text-center placeholder:text-[#6E7C73] outline-none focus:border-[#74D834]/50"
               />
               <button
                 type="submit"
-                aria-label="Añadir"
-                className="min-h-[40px] min-w-[40px] rounded-xl bg-[#74D834] text-[#081007] flex items-center justify-center cursor-pointer"
+                aria-label="Añadir a lista"
+                className="w-11 min-h-[42px] rounded-2xl bg-[#74D834] text-[#081007] flex items-center justify-center cursor-pointer hover:bg-[#82E63E] transition-all shrink-0"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4 stroke-[2.5]" />
               </button>
             </form>
 
-            <div className="divide-y divide-white/6">
-              {shoppingList.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => onToggleShoppingItem(item.id)}
-                  className="w-full py-2.5 flex items-center justify-between gap-2 text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span
-                      className={`w-4 h-4 rounded flex items-center justify-center border shrink-0 ${
-                        item.checked
-                          ? 'bg-[#74D834] border-[#74D834] text-[#081007]'
-                          : 'border-[#45544A]'
-                      }`}
-                    >
-                      {item.checked && <Check className="w-3 h-3 stroke-[3]" />}
+            <div className="divide-y divide-white/6 pt-1 max-h-72 overflow-y-auto pr-1">
+              {shoppingList.length === 0 ? (
+                <div className="py-8 text-center text-xs text-[#8E9D93]">
+                  No hay artículos en tu lista de compras
+                </div>
+              ) : (
+                shoppingList.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => onToggleShoppingItem(item.id)}
+                    className="w-full py-3 flex items-center justify-between gap-3 text-left cursor-pointer hover:bg-white/2 rounded-xl px-2 transition-all"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all shrink-0 ${
+                          item.checked
+                            ? 'bg-[#74D834] border-[#74D834] text-[#081007]'
+                            : 'border-white/20 bg-white/5'
+                        }`}
+                      >
+                        {item.checked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      </div>
+                      <span
+                        className={`text-xs font-medium truncate ${
+                          item.checked ? 'line-through text-[#6E7C73]' : 'text-white'
+                        }`}
+                      >
+                        {item.name}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono-nums text-[#8E9D93] shrink-0">
+                      {item.quantity}
                     </span>
-                    <span
-                      className={`text-xs truncate ${
-                        item.checked ? 'line-through text-[#6E7D73]' : 'text-white'
-                      }`}
-                    >
-                      {item.name}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-[#9AA89E] shrink-0">{item.quantity}</span>
-                </button>
-              ))}
+                  </button>
+                ))
+              )}
             </div>
           </div>
         </div>
