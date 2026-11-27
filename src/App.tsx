@@ -521,9 +521,9 @@ export default function App() {
         {isAuthenticated && (
           <nav
             aria-label="Barra inferior móvil"
-            className="fixed bottom-0 left-0 right-0 z-40 bg-[#0D130F]/95 backdrop-blur-md border-t border-white/8 pb-[env(safe-area-inset-bottom,0px)]"
+            className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] pointer-events-none"
           >
-            <div className="grid grid-cols-5 items-center h-16 px-1">
+            <div className="liquid-glass-nav rounded-[28px] grid grid-cols-5 items-center h-16 px-1.5 pointer-events-auto">
               {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
                 const isActive = !showHealthSubView && activeTab === item.id;
@@ -532,16 +532,18 @@ export default function App() {
                     key={item.id}
                     type="button"
                     onClick={() => handleSelectTab(item.id)}
-                    className="min-h-[48px] flex flex-col items-center justify-center gap-1 cursor-pointer"
+                    className={`min-h-[48px] rounded-[22px] flex flex-col items-center justify-center gap-1 cursor-pointer transition-all apple-press ${
+                      isActive ? 'bg-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]' : ''
+                    }`}
                   >
                     <Icon
-                      className={`w-5 h-5 ${
-                        isActive ? 'text-[#74D834]' : 'text-[#849489]'
+                      className={`w-5 h-5 transition-colors ${
+                        isActive ? 'text-[#74D834]' : 'text-[#9AA89E]'
                       }`}
                     />
                     <span
-                      className={`text-[10px] font-medium leading-none ${
-                        isActive ? 'text-[#74D834]' : 'text-[#849489]'
+                      className={`text-[10px] font-semibold leading-none ${
+                        isActive ? 'text-[#74D834]' : 'text-[#9AA89E]'
                       }`}
                     >
                       {item.label}
@@ -589,9 +591,9 @@ export default function App() {
             {isAuthenticated && (
               <nav
                 aria-label="Navegación de la app móvil"
-                className="absolute bottom-0 inset-x-0 z-30 bg-[#0D130F]/95 backdrop-blur-md border-t border-white/8"
+                className="absolute bottom-2.5 inset-x-3 z-30"
               >
-                <div className="grid grid-cols-5 items-center h-16 px-1">
+                <div className="liquid-glass-nav rounded-[28px] grid grid-cols-5 items-center h-16 px-1.5">
                   {NAV_ITEMS.map((item) => {
                     const Icon = item.icon;
                     const isActive = !showHealthSubView && activeTab === item.id;
@@ -600,16 +602,18 @@ export default function App() {
                         key={item.id}
                         type="button"
                         onClick={() => handleSelectTab(item.id)}
-                        className="min-h-[48px] flex flex-col items-center justify-center gap-1 cursor-pointer"
+                        className={`min-h-[48px] rounded-[22px] flex flex-col items-center justify-center gap-1 cursor-pointer transition-all apple-press ${
+                          isActive ? 'bg-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]' : ''
+                        }`}
                       >
                         <Icon
                           className={`w-5 h-5 transition-colors ${
-                            isActive ? 'text-[#74D834]' : 'text-[#849489]'
+                            isActive ? 'text-[#74D834]' : 'text-[#9AA89E]'
                           }`}
                         />
                         <span
-                          className={`text-[10px] font-medium leading-none whitespace-nowrap ${
-                            isActive ? 'text-[#74D834]' : 'text-[#849489]'
+                          className={`text-[10px] font-semibold leading-none whitespace-nowrap ${
+                            isActive ? 'text-[#74D834]' : 'text-[#9AA89E]'
                           }`}
                         >
                           {item.label}

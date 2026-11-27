@@ -330,7 +330,7 @@ export function NutritionView({
       )}
 
       {/* Hero Apple Glass Calorie Card */}
-      <div className="apple-glass-card rounded-[28px] p-4.5 space-y-4">
+      <div className="liquid-glass-card rounded-[28px] p-4.5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-1">
             <span className="text-[11px] font-semibold tracking-wider uppercase text-[#8E9D93]">
@@ -353,13 +353,8 @@ export function NutritionView({
             </div>
           </div>
 
-          <div className="shrink-0 relative">
-            <ProgressRing percent={caloriePercent} size={82} strokeWidth={8} />
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <span className="font-mono-nums text-xs font-extrabold text-white">
-                {caloriePercent}%
-              </span>
-            </div>
+          <div className="shrink-0">
+            <ProgressRing percent={caloriePercent} size={86} strokeWidth={8} />
           </div>
         </div>
 
