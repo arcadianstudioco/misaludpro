@@ -350,12 +350,20 @@ export function useHealthStore() {
             skipNextSyncRef.current = true;
 
             if (session.appState && session.appState.profile) {
-              // If local state had pending modifications, prioritize them and push to server
-              if (initialMeta.pendingChangesCount > 0 && cachedState) {
-                void syncStateToServer(cachedState);
-              } else {
-                setState({ ...session.appState, isAuthenticated: true });
-                await saveLocalState({ ...session.appState, isAuthenticated: true }, false);
+              const cloudFull: AppState = { ...session.appState, isAuthenticated: true };
+              const merged = mergeOfflineAndCloudState(cloudFull, cachedState);
+              const hadLocalExtras =
+                initialMeta.pendingChangesCount > 0 ||
+                (cachedState !== null &&
+                  ((cachedState.workoutSessions?.length || 0) > (cloudFull.workoutSessions?.length || 0) ||
+                    (cachedState.meals?.length || 0) > (cloudFull.meals?.length || 0) ||
+                    (cachedState.measurements?.length || 0) > (cloudFull.measurements?.length || 0) ||
+                    (cachedState.progressPhotos?.length || 0) > (cloudFull.progressPhotos?.length || 0)));
+
+              setState(merged);
+              await saveLocalState(merged, hadLocalExtras);
+              if (hadLocalExtras) {
+                void syncStateToServer(merged);
               }
             } else if (cachedState) {
               void syncStateToServer(cachedState);
@@ -870,37 +878,41 @@ export function useHealthStore() {
       caloriesBurned: number,
       extra?: Partial<WorkoutSessionLog>
     ) => {
+      const sessionDate = extra?.completedAt || today;
       const newSession: WorkoutSessionLog = {
         id: `ws-${Date.now()}`,
         routineId,
         routineTitle,
         durationSec,
         caloriesBurned,
-        completedAt: today,
+        completedAt: sessionDate,
         ...extra,
       };
       setState((prev) => {
         if (!prev) return prev;
-        const current = prev.habitsByDate[today] || {
-          date: today,
+        const current = prev.habitsByDate[sessionDate] || {
+          date: sessionDate,
           workoutDone: false,
           healthyEatingDone: false,
           waterLiters: 0,
           sleepHours: 0,
           kegelDone: false,
         };
-        return {
+        const nextState: AppState = {
           ...prev,
           workoutSessions: [newSession, ...prev.workoutSessions],
           habitsByDate: {
             ...prev.habitsByDate,
-            [today]: {
+            [sessionDate]: {
               ...current,
               workoutDone: true,
               kegelDone: routineId.includes('kegel') ? true : current.kegelDone,
             },
           },
         };
+        // Persist immediately so no offline session can ever be lost
+        void saveLocalState(nextState, true);
+        return nextState;
       });
       return newSession;
     },
