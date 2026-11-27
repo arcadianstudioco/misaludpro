@@ -560,6 +560,11 @@ export default function App() {
               onExportJson={exportAllDataJson}
               onSignOut={signOut}
               onDeleteAccount={() => void deleteAccountAndData()}
+              currentStreak={habitStreaks.currentStreak}
+              sessions={state.workoutSessions}
+              habitsByDate={state.habitsByDate}
+              measurements={state.measurements}
+              meals={state.meals}
               onOpenAchievements={() => setShowAchievementsView(true)}
               achievementsSummary={(() => {
                 const list = computeAchievements({

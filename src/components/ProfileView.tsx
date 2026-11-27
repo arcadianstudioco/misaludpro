@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowLeft,
   Bell,
   Camera,
   Check,
@@ -9,6 +10,8 @@ import {
   ExternalLink,
   FileCheck2,
   FileText,
+  Flame,
+  Gift,
   Globe,
   HardDrive,
   HeartPulse,
@@ -19,8 +22,11 @@ import {
   Pencil,
   RefreshCw,
   Server,
+  Settings,
   Shield,
+  Star,
   Sun,
+  Target,
   Trash2,
   Trophy,
   Wifi,
@@ -30,17 +36,27 @@ import {
 import { SyncStatus } from '../services/localPersistence';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
 import {
+  DailyHabits,
   FitnessGoal,
   FitnessLevel,
+  MealEntry,
   ReminderSettings,
   UserProfile,
   WorkoutLocation,
+  WorkoutSessionLog,
 } from '../types/health';
 import { UserAvatarImage } from './BrandLogo';
 import { calculateBmi, calculateMacroTargets } from '../data/seedData';
 import { ThemeMode } from '../hooks/useTheme';
 import { AuthUser } from '../services/authClient';
 import { LegalDocTab, LegalDocumentsModal } from './LegalDocumentsModal';
+import {
+  Achievement,
+  computeAchievements,
+  computeUserLevel,
+  formatAchievementDate,
+} from '../utils/achievements';
+import { AchievementDetailModal } from './AchievementsView';
 
 interface ProfileViewProps {
   profile: UserProfile;
@@ -66,6 +82,11 @@ interface ProfileViewProps {
   onExportJson: () => void;
   onSignOut: () => void;
   onDeleteAccount: () => void;
+  currentStreak?: number;
+  sessions?: WorkoutSessionLog[];
+  habitsByDate?: Record<string, DailyHabits>;
+  measurements?: { date: string }[];
+  meals?: MealEntry[];
   onOpenAchievements?: () => void;
   achievementsSummary?: {
     level: number;
@@ -96,9 +117,16 @@ export function ProfileView({
   onExportJson,
   onSignOut,
   onDeleteAccount,
-  onOpenAchievements,
-  achievementsSummary,
+  currentStreak = 0,
+  sessions = [],
+  habitsByDate = {},
+  measurements = [],
+  meals = [],
 }: ProfileViewProps) {
+  const [showSettings, setShowSettings] = useState(false);
+  const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
+  const [showAllMedals, setShowAllMedals] = useState(false);
+  const [showAllChallenges, setShowAllChallenges] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -109,17 +137,51 @@ export function ProfileView({
 
   const [cropSrc, setCropSrc] = useState<string | null>(null);
 
+  const achievements = useMemo(
+    () =>
+      computeAchievements({
+        currentStreak,
+        sessions,
+        habitsByDate,
+        measurements,
+        meals,
+      }),
+    [currentStreak, sessions, habitsByDate, measurements, meals]
+  );
+
+  const userLevel = useMemo(() => computeUserLevel(achievements), [achievements]);
+
+  const unlockedList = useMemo(
+    () => achievements.filter((a) => Boolean(a.unlockedAt)),
+    [achievements]
+  );
+  const lockedList = useMemo(
+    () => achievements.filter((a) => !a.unlockedAt),
+    [achievements]
+  );
+  const orderedMedals = useMemo(
+    () => [...unlockedList, ...lockedList],
+    [unlockedList, lockedList]
+  );
+  const visibleMedals = showAllMedals ? orderedMedals : orderedMedals.slice(0, 4);
+  const levelPct =
+    userLevel.xpToNext > 0
+      ? Math.min(100, Math.round((userLevel.currentXp / userLevel.xpToNext) * 100))
+      : 100;
+
   useEffect(() => {
     const onBack = () => {
-      if (cropSrc) setCropSrc(null);
+      if (selectedAchievement) setSelectedAchievement(null);
+      else if (cropSrc) setCropSrc(null);
       else if (legalTab) setLegalTab(null);
       else if (showPasswordModal) setShowPasswordModal(false);
       else if (showEditModal) setShowEditModal(false);
       else if (showDeleteConfirm) setShowDeleteConfirm(false);
+      else if (showSettings) setShowSettings(false);
     };
     window.addEventListener('flutter-back', onBack);
     return () => window.removeEventListener('flutter-back', onBack);
-  }, [cropSrc, legalTab, showPasswordModal, showEditModal, showDeleteConfirm]);
+  }, [selectedAchievement, cropSrc, legalTab, showPasswordModal, showEditModal, showDeleteConfirm, showSettings]);
   const [cropZoom, setCropZoom] = useState(1);
   const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
   const [cropImgSize, setCropImgSize] = useState<{ w: number; h: number } | null>(null);
@@ -281,122 +343,418 @@ export function ProfileView({
 
   return (
     <div className="space-y-4 pb-4">
-      <div className="flex items-center justify-between pt-1">
-        <h1 className="font-display text-2xl font-bold text-white">Perfil</h1>
-        <button
-          type="button"
-          onClick={() => {
-            setName(profile.name);
-            setAge(String(profile.age));
-            setHeightCm(String(profile.heightCm));
-            setTargetWeightKg(String(profile.targetWeightKg));
-            setWaterL(String(profile.waterTargetLiters));
-            setGoal(profile.goal);
-            setLevel(profile.level);
-            setLocation(profile.location);
-            setShowEditModal(true);
-          }}
-          className="min-h-[38px] px-3 rounded-xl bg-[#131A16] border border-white/8 text-xs font-medium text-[#D2DDD5] inline-flex items-center gap-1.5 cursor-pointer"
-        >
-          <Pencil className="w-3.5 h-3.5 text-[#74D834]" />
-          <span>Editar</span>
-        </button>
-      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleAvatarFileChange}
+      />
 
-      {/* User Card */}
-      <div className="rounded-3xl bg-[#131A16] border border-white/8 p-4 space-y-3.5">
-        <div className="flex items-center gap-3.5">
-          <div
-            className="relative cursor-pointer group shrink-0"
-            onClick={() => fileInputRef.current?.click()}
-            title="Cambiar foto de perfil"
-          >
-            <UserAvatarImage
-              name={profile.name}
-              sizeClass="w-14 h-14"
-              customUrl={profile.avatarUrl}
-            />
-            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-85 group-hover:opacity-100 transition-opacity">
-              <Camera className="w-4 h-4 text-[#74D834]" />
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarFileChange}
-            />
+      {!showSettings ? (
+        <>
+          {/* Header idéntico a la pantalla de referencia */}
+          <div className="flex items-center justify-between pt-1">
+            <h1 className="font-display text-2xl font-bold text-white tracking-tight">
+              Premios y logros
+            </h1>
+            <button
+              type="button"
+              onClick={() => setShowSettings(true)}
+              aria-label="Configuración y cuenta"
+              className="w-10 h-10 rounded-full bg-[#131A16] border border-white/10 flex items-center justify-center text-[#D2DDD5] hover:text-white cursor-pointer active:scale-95 transition-transform"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
           </div>
-          <div className="min-w-0 flex-1">
+
+          {/* Tarjeta de Usuario + Nivel + Barra XP */}
+          <div className="rounded-3xl bg-[#111814] border border-white/8 p-4">
+            <div className="flex items-center gap-3.5">
+              <div
+                className="relative cursor-pointer group shrink-0"
+                onClick={() => fileInputRef.current?.click()}
+                title="Cambiar foto de perfil"
+              >
+                <UserAvatarImage
+                  name={profile.name}
+                  sizeClass="w-14 h-14"
+                  customUrl={profile.avatarUrl}
+                />
+                <div
+                  className="absolute inset-0 rounded-full border-2 border-[#74D834]/65 pointer-events-none"
+                  style={{ boxShadow: '0 0 12px #74D83430' }}
+                />
+                <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#111814] border border-white/15 flex items-center justify-center">
+                  <Camera className="w-2.5 h-2.5 text-[#74D834]" />
+                </div>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="font-display text-base font-bold text-white truncate">
+                    {profile.name}
+                  </h2>
+                  <span className="text-xs font-bold text-[#74D834] shrink-0">
+                    Nivel {userLevel.level}
+                  </span>
+                </div>
+                <p className="text-xs text-[#9AA89E] mt-0.5 truncate">
+                  Nivel: {userLevel.title}
+                </p>
+
+                <div className="mt-2.5 space-y-1">
+                  <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${Math.max(8, levelPct)}%`,
+                        background: 'linear-gradient(90deg, #48b824, #74D834)',
+                        boxShadow: '0 0 8px #74D83450',
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] font-mono-nums text-[#9AA89E]">
+                    <span>{userLevel.currentXp} / {userLevel.xpToNext} pts</span>
+                    <span className="text-[#74D834]">{userLevel.totalXp} pts totales</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Racha activa */}
+          <button
+            type="button"
+            onClick={() => {
+              const streakAch =
+                achievements.find((a) => a.id === 'streak_3' || a.id.startsWith('streak')) ??
+                achievements[0];
+              if (streakAch) setSelectedAchievement(streakAch);
+            }}
+            className="w-full rounded-3xl bg-[#111814] border border-white/8 p-4 flex items-center justify-between gap-3 text-left cursor-pointer active:scale-[0.99] transition-transform"
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div
+                className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+                style={{
+                  background: 'radial-gradient(circle at 30% 30%, #FF6B3540, #FF6B3510 70%)',
+                  border: '1px solid #FF6B3540',
+                }}
+              >
+                <Flame className="w-6 h-6 text-[#FF6B35]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-[#9AA89E] font-medium">Racha activa</p>
+                <p className="font-display text-2xl font-extrabold text-white leading-none mt-0.5">
+                  {currentStreak}{' '}
+                  <span className="text-base font-semibold text-[#D2DDD5]">
+                    {currentStreak === 1 ? 'día' : 'días'}
+                  </span>
+                </p>
+                <p className="text-[11px] text-[#9AA89E] mt-0.5 truncate">
+                  {currentStreak > 0
+                    ? '¡Vas muy bien! Mantén la constancia.'
+                    : 'Completa tus hábitos hoy para iniciar tu racha.'}
+                </p>
+              </div>
+            </div>
+            <span
+              className="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-0.5 shrink-0"
+              style={{
+                backgroundColor: '#74D83418',
+                color: '#74D834',
+                border: '1px solid #74D83435',
+              }}
+            >
+              +{currentStreak * 15} pts
+              <ChevronRight className="w-3.5 h-3.5" />
+            </span>
+          </button>
+
+          {/* Tus medallas */}
+          <section className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-base font-bold text-white truncate">
-                {profile.name}
-              </h2>
+              <h2 className="font-display text-base font-bold text-white">Tus medallas</h2>
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="text-[11px] text-[#74D834] font-medium hover:underline flex items-center gap-1 cursor-pointer"
+                onClick={() => setShowAllMedals((v) => !v)}
+                className="text-xs font-semibold text-[#74D834] inline-flex items-center gap-0.5 cursor-pointer"
               >
-                <Camera className="w-3 h-3" />
-                <span>Cambiar foto</span>
+                <span>{showAllMedals ? 'Ver menos' : 'Ver todas'}</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
-            <p className="text-xs text-[#9AA89E] truncate">{profile.email}</p>
-            <p className="text-[11px] text-[#74D834] mt-0.5 truncate">
-              {profile.goal} · {profile.level} · {profile.location}
-            </p>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-4 gap-2 pt-2.5 border-t border-white/6 text-center">
-          <div>
-            <p className="text-[10px] text-[#8E9D93]">Edad</p>
-            <p className="font-mono-nums text-xs font-bold text-white mt-0.5">{profile.age}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-[#8E9D93]">Estatura</p>
-            <p className="font-mono-nums text-xs font-bold text-white mt-0.5">
-              {Math.round(profile.heightCm)} cm
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] text-[#8E9D93]">Peso</p>
-            <p className="font-mono-nums text-xs font-bold text-white mt-0.5">
-              {currentWeightKg} kg
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] text-[#8E9D93]">IMC</p>
-            <p className="font-mono-nums text-xs font-bold text-[#74D834] mt-0.5">{bmi}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Premios y logros */}
-      {onOpenAchievements && (
-        <button
-          type="button"
-          onClick={onOpenAchievements}
-          className="w-full liquid-glass-card rounded-3xl p-4 flex items-center justify-between gap-3 text-left cursor-pointer active:scale-[0.99] transition-transform"
-        >
-          <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-11 h-11 rounded-2xl bg-[#74D834]/15 border border-[#74D834]/30 flex items-center justify-center shrink-0">
-              <Trophy className="w-5.5 h-5.5 text-[#74D834]" />
+            <div className="grid grid-cols-4 gap-2.5">
+              {visibleMedals.map((ach) => {
+                const unlocked = Boolean(ach.unlockedAt);
+                return (
+                  <button
+                    key={ach.id}
+                    type="button"
+                    onClick={() => setSelectedAchievement(ach)}
+                    className="flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform"
+                  >
+                    <div
+                      className="w-[62px] h-[62px] rounded-full flex items-center justify-center border-2 relative"
+                      style={{
+                        background: unlocked
+                          ? `radial-gradient(circle at 30% 28%, ${ach.color}65, ${ach.color}14 60%, #0F1712 85%)`
+                          : 'radial-gradient(circle at 30% 28%, rgba(255,255,255,0.08), #0F1712 75%)',
+                        borderColor: unlocked ? ach.color : 'rgba(255,255,255,0.12)',
+                        boxShadow: unlocked ? `0 0 18px ${ach.color}35` : 'none',
+                      }}
+                    >
+                      <span
+                        className={`text-2xl select-none ${unlocked ? '' : 'grayscale opacity-35'}`}
+                        style={unlocked ? { filter: `drop-shadow(0 0 6px ${ach.color}60)` } : undefined}
+                      >
+                        {ach.emoji}
+                      </span>
+                      {unlocked && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#74D834] text-black flex items-center justify-center border-2 border-[#0A0D0B]">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </div>
+                      )}
+                    </div>
+                    <p
+                      className="text-[11px] font-semibold mt-1.5 leading-tight truncate w-full px-0.5"
+                      style={{ color: unlocked ? '#E8F0EA' : '#9AA89E' }}
+                    >
+                      {ach.title}
+                    </p>
+                    <p className="text-[10px] text-[#6B7A70] leading-tight">
+                      {unlocked
+                        ? formatAchievementDate(ach.unlockedAt)
+                        : `${Math.round((ach.progress ?? 0) * 100)}%`}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
-            <div className="min-w-0">
-              <p className="font-display text-sm font-bold text-white">Premios y logros</p>
-              <p className="text-xs text-[#9AA89E] truncate">
-                {achievementsSummary
-                  ? `Nivel ${achievementsSummary.level} · ${achievementsSummary.unlockedCount} medallas · ${achievementsSummary.totalXp} pts`
-                  : 'Medallas, rachas y retos cumplidos'}
-              </p>
+          </section>
+
+          {/* Retos completados */}
+          <section className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-base font-bold text-white">Retos completados</h2>
+              <button
+                type="button"
+                onClick={() => setShowAllChallenges((v) => !v)}
+                className="text-xs font-semibold text-[#74D834] inline-flex items-center gap-0.5 cursor-pointer"
+              >
+                <span>{showAllChallenges ? 'Ver menos' : 'Ver todos'}</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {[...unlockedList, ...lockedList]
+                .slice(0, showAllChallenges ? undefined : 3)
+                .map((ach) => {
+                  const unlocked = Boolean(ach.unlockedAt);
+                  const pct = Math.round((ach.progress ?? 0) * 100);
+                  return (
+                    <button
+                      key={ach.id}
+                      type="button"
+                      onClick={() => setSelectedAchievement(ach)}
+                      className="w-full rounded-2xl px-3.5 py-3 flex items-center justify-between gap-3 text-left cursor-pointer active:scale-[0.99] transition-transform border"
+                      style={{
+                        backgroundColor: unlocked ? 'rgba(116,216,52,0.06)' : '#111814',
+                        borderColor: unlocked ? 'rgba(116,216,52,0.2)' : 'rgba(255,255,255,0.07)',
+                      }}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                          style={{
+                            backgroundColor: unlocked ? '#74D834' : 'rgba(255,255,255,0.07)',
+                            border: unlocked ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                          }}
+                        >
+                          {unlocked ? (
+                            <Check className="w-4.5 h-4.5 text-black stroke-[2.75]" />
+                          ) : (
+                            <span className="text-base grayscale opacity-60">{ach.emoji}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-white truncate">{ach.title}</p>
+                          <p className="text-[11px] text-[#9AA89E]">
+                            {unlocked
+                              ? `Completado · ${ach.points} pts`
+                              : `En progreso (${pct}%) · ${ach.points} pts`}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#9AA89E] shrink-0" />
+                    </button>
+                  );
+                })}
+            </div>
+          </section>
+
+          {/* Tu progreso */}
+          <section className="space-y-2.5">
+            <h2 className="font-display text-base font-bold text-white">Tu progreso</h2>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                {
+                  icon: <Flame className="w-4.5 h-4.5 text-[#FF6B35]" />,
+                  value: currentStreak,
+                  label: 'Días de racha',
+                },
+                {
+                  icon: <Star className="w-4.5 h-4.5 text-[#FFD700]" />,
+                  value: unlockedList.length,
+                  label: 'Medallas',
+                },
+                {
+                  icon: <Target className="w-4.5 h-4.5 text-[#0A95FF]" />,
+                  value: lockedList.length,
+                  label: 'Retos activos',
+                },
+                {
+                  icon: <Gift className="w-4.5 h-4.5 text-[#74D834]" />,
+                  value: userLevel.totalXp,
+                  label: 'Puntos totales',
+                },
+              ].map((item, i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl bg-[#111814] border border-white/7 p-2.5 text-center"
+                >
+                  <div className="flex justify-center">{item.icon}</div>
+                  <p className="font-mono-nums text-base font-bold mt-1 text-white">
+                    {item.value}
+                  </p>
+                  <p className="text-[10px] text-[#9AA89E] leading-tight mt-0.5">
+                    {item.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Acceso directo a configuración y datos de cuenta */}
+          <button
+            type="button"
+            onClick={() => setShowSettings(true)}
+            className="w-full rounded-2xl bg-[#111814] border border-white/8 px-4 py-3.5 flex items-center justify-between text-left cursor-pointer active:scale-[0.99] transition-transform"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-white/6 flex items-center justify-center text-[#74D834]">
+                <Settings className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">Configuración y cuenta</p>
+                <p className="text-[11px] text-[#9AA89E]">
+                  Datos físicos, tema, recordatorios, respaldo y sesión
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[#9AA89E]" />
+          </button>
+        </>
+      ) : (
+        <>
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowSettings(false)}
+                aria-label="Volver a Premios y logros"
+                className="w-9 h-9 rounded-full bg-[#131A16] border border-white/10 flex items-center justify-center text-white cursor-pointer"
+              >
+                <ArrowLeft className="w-4.5 h-4.5" />
+              </button>
+              <h1 className="font-display text-xl font-bold text-white">Configuración y cuenta</h1>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setName(profile.name);
+                setAge(String(profile.age));
+                setHeightCm(String(profile.heightCm));
+                setTargetWeightKg(String(profile.targetWeightKg));
+                setWaterL(String(profile.waterTargetLiters));
+                setGoal(profile.goal);
+                setLevel(profile.level);
+                setLocation(profile.location);
+                setShowEditModal(true);
+              }}
+              className="min-h-[38px] px-3 rounded-xl bg-[#131A16] border border-white/8 text-xs font-medium text-[#D2DDD5] inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <Pencil className="w-3.5 h-3.5 text-[#74D834]" />
+              <span>Editar</span>
+            </button>
+          </div>
+
+          {/* User Card */}
+          <div className="rounded-3xl bg-[#131A16] border border-white/8 p-4 space-y-3.5">
+            <div className="flex items-center gap-3.5">
+              <div
+                className="relative cursor-pointer group shrink-0"
+                onClick={() => fileInputRef.current?.click()}
+                title="Cambiar foto de perfil"
+              >
+                <UserAvatarImage
+                  name={profile.name}
+                  sizeClass="w-14 h-14"
+                  customUrl={profile.avatarUrl}
+                />
+                <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-85 group-hover:opacity-100 transition-opacity">
+                  <Camera className="w-4 h-4 text-[#74D834]" />
+                </div>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-display text-base font-bold text-white truncate">
+                    {profile.name}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-[11px] text-[#74D834] font-medium hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Camera className="w-3 h-3" />
+                    <span>Cambiar foto</span>
+                  </button>
+                </div>
+                <p className="text-xs text-[#9AA89E] truncate">{profile.email}</p>
+                <p className="text-[11px] text-[#74D834] mt-0.5 truncate">
+                  {profile.goal} · {profile.level} · {profile.location}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2 pt-2.5 border-t border-white/6 text-center">
+              <div>
+                <p className="text-[10px] text-[#8E9D93]">Edad</p>
+                <p className="font-mono-nums text-xs font-bold text-white mt-0.5">{profile.age}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[#8E9D93]">Estatura</p>
+                <p className="font-mono-nums text-xs font-bold text-white mt-0.5">
+                  {Math.round(profile.heightCm)} cm
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[#8E9D93]">Peso</p>
+                <p className="font-mono-nums text-xs font-bold text-white mt-0.5">
+                  {currentWeightKg} kg
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[#8E9D93]">IMC</p>
+                <p className="font-mono-nums text-xs font-bold text-[#74D834] mt-0.5">{bmi}</p>
+              </div>
             </div>
           </div>
-          <ChevronRight className="w-4.5 h-4.5 text-[#9AA89E] shrink-0" />
-        </button>
-      )}
 
-      {/* Global Theme Switcher (Oscuro / Claro) */}
+          {/* Global Theme Switcher (Oscuro / Claro) */}
       <div className="rounded-3xl bg-[#131A16] border border-white/8 p-4 space-y-2.5">
         <div className="flex items-center justify-between">
           <div>
@@ -708,6 +1066,16 @@ export function ProfileView({
           <span>Eliminar cuenta y datos</span>
         </button>
       </div>
+        </>
+      )}
+
+      {/* Modal individual de logro al tocar cualquier medalla, racha o reto */}
+      {selectedAchievement && (
+        <AchievementDetailModal
+          achievement={selectedAchievement}
+          onClose={() => setSelectedAchievement(null)}
+        />
+      )}
 
       {/* Edit Profile Modal */}
       {showEditModal && (
