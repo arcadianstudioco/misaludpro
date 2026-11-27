@@ -304,8 +304,8 @@ export function OutdoorRunTracker({
         )}
       </div>
 
-      {/* Live Apple Fitness Stopwatch HUD */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
+      {/* Live Apple Fitness Stopwatch HUD + botón pegado abajo del cuadro */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         <div className="rounded-3xl bg-[#1C1C1E] border border-white/8 p-3.5 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <div>
@@ -381,18 +381,13 @@ export function OutdoorRunTracker({
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Pinned Apple Fitness Action Controls (always visible above home indicator) */}
-      <div
-        className="shrink-0 px-4 pt-2.5 bg-black/95 border-t border-white/8"
-        style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom, 16px))' }}
-      >
+        {/* Botón acción: pegado justo debajo del cuadro de stats */}
         {status === 'ready' ? (
           <button
             type="button"
             onClick={handleStart}
-            className="w-full min-h-[54px] rounded-2xl bg-[#9CE819] text-black font-display font-bold text-base flex items-center justify-center gap-2 cursor-pointer hover:brightness-105 active:scale-[0.98] transition-all shadow-lg shadow-[#9CE819]/25"
+            className="w-full min-h-[56px] rounded-2xl bg-[#9CE819] text-black font-display font-bold text-base flex items-center justify-center gap-2 cursor-pointer active:scale-[0.97] transition-all shadow-lg shadow-[#9CE819]/30"
           >
             <Play className="w-5 h-5 fill-current" />
             <span>Iniciar {activity === 'Carrera al aire libre' ? 'carrera' : 'caminata'}</span>
@@ -402,28 +397,20 @@ export function OutdoorRunTracker({
             <button
               type="button"
               onClick={() => setStatus(status === 'running' ? 'paused' : 'running')}
-              className={`min-h-[52px] rounded-2xl font-display font-bold text-sm flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] transition-all ${
-                status === 'running'
-                  ? 'bg-[#FFE620] text-black'
-                  : 'bg-[#9CE819] text-black'
+              className={`min-h-[52px] rounded-2xl font-display font-bold text-sm flex items-center justify-center gap-2 cursor-pointer active:scale-[0.97] transition-all ${
+                status === 'running' ? 'bg-[#FFE620] text-black' : 'bg-[#9CE819] text-black'
               }`}
             >
               {status === 'running' ? (
-                <>
-                  <Pause className="w-4.5 h-4.5 fill-current" />
-                  <span>Pausar</span>
-                </>
+                <><Pause className="w-4.5 h-4.5 fill-current" /><span>Pausar</span></>
               ) : (
-                <>
-                  <Play className="w-4.5 h-4.5 fill-current" />
-                  <span>Reanudar</span>
-                </>
+                <><Play className="w-4.5 h-4.5 fill-current" /><span>Reanudar</span></>
               )}
             </button>
             <button
               type="button"
               onClick={handleFinishAndSave}
-              className="min-h-[52px] rounded-2xl bg-[#FA114F] text-white font-display font-bold text-sm flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] transition-all"
+              className="min-h-[52px] rounded-2xl bg-[#FA114F] text-white font-display font-bold text-sm flex items-center justify-center gap-2 cursor-pointer active:scale-[0.97] transition-all"
             >
               <Square className="w-4 h-4 fill-current" />
               <span>Finalizar</span>
