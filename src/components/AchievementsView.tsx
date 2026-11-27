@@ -261,9 +261,9 @@ export function AchievementsView({
         {/* Tarjeta de Usuario y Nivel */}
         <div className="liquid-glass-card rounded-3xl p-4 flex items-center gap-3.5">
           <UserAvatarImage
-            src={profile.avatarUrl}
             name={profile.name}
-            className="w-13 h-13 rounded-full object-cover border-2 border-[#74D834]/50 shrink-0"
+            sizeClass="w-13 h-13 shrink-0 border-2 border-[#74D834]/50"
+            customUrl={profile.avatarUrl}
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">

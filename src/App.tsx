@@ -32,7 +32,11 @@ import {
   AchievementDetailModal,
   AchievementsView,
 } from './components/AchievementsView';
-import { Achievement, computeAchievements } from './utils/achievements';
+import {
+  Achievement,
+  computeAchievements,
+  computeUserLevel,
+} from './utils/achievements';
 import { syncNativeAlarms, syncNativeWidgets } from './utils/nativeAlarms';
 import { estimateStepsFromSessions } from './components/SessionsModal';
 import { useTheme } from './hooks/useTheme';
@@ -556,6 +560,23 @@ export default function App() {
               onExportJson={exportAllDataJson}
               onSignOut={signOut}
               onDeleteAccount={() => void deleteAccountAndData()}
+              onOpenAchievements={() => setShowAchievementsView(true)}
+              achievementsSummary={(() => {
+                const list = computeAchievements({
+                  currentStreak: habitStreaks.currentStreak,
+                  sessions: state.workoutSessions,
+                  habitsByDate: state.habitsByDate,
+                  measurements: state.measurements,
+                  meals: state.meals,
+                });
+                const lvl = computeUserLevel(list);
+                return {
+                  level: lvl.level,
+                  title: lvl.title,
+                  unlockedCount: list.filter((a) => Boolean(a.unlockedAt)).length,
+                  totalXp: lvl.totalXp,
+                };
+              })()}
             />
           </div>
         )}

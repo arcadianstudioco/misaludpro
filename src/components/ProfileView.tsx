@@ -22,6 +22,7 @@ import {
   Shield,
   Sun,
   Trash2,
+  Trophy,
   Wifi,
   WifiOff,
   X,
@@ -65,6 +66,13 @@ interface ProfileViewProps {
   onExportJson: () => void;
   onSignOut: () => void;
   onDeleteAccount: () => void;
+  onOpenAchievements?: () => void;
+  achievementsSummary?: {
+    level: number;
+    title: string;
+    unlockedCount: number;
+    totalXp: number;
+  };
 }
 
 export function ProfileView({
@@ -88,6 +96,8 @@ export function ProfileView({
   onExportJson,
   onSignOut,
   onDeleteAccount,
+  onOpenAchievements,
+  achievementsSummary,
 }: ProfileViewProps) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -361,6 +371,30 @@ export function ProfileView({
           </div>
         </div>
       </div>
+
+      {/* Premios y logros */}
+      {onOpenAchievements && (
+        <button
+          type="button"
+          onClick={onOpenAchievements}
+          className="w-full liquid-glass-card rounded-3xl p-4 flex items-center justify-between gap-3 text-left cursor-pointer active:scale-[0.99] transition-transform"
+        >
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-11 h-11 rounded-2xl bg-[#74D834]/15 border border-[#74D834]/30 flex items-center justify-center shrink-0">
+              <Trophy className="w-5.5 h-5.5 text-[#74D834]" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-display text-sm font-bold text-white">Premios y logros</p>
+              <p className="text-xs text-[#9AA89E] truncate">
+                {achievementsSummary
+                  ? `Nivel ${achievementsSummary.level} · ${achievementsSummary.unlockedCount} medallas · ${achievementsSummary.totalXp} pts`
+                  : 'Medallas, rachas y retos cumplidos'}
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="w-4.5 h-4.5 text-[#9AA89E] shrink-0" />
+        </button>
+      )}
 
       {/* Global Theme Switcher (Oscuro / Claro) */}
       <div className="rounded-3xl bg-[#131A16] border border-white/8 p-4 space-y-2.5">
