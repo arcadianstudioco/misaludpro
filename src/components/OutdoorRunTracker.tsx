@@ -267,7 +267,7 @@ export function OutdoorRunTracker({
       </div>
 
       {/* Live Map with Mobile Geolocation */}
-      <div className="relative h-44 w-full shrink-0 bg-[#1B2432]">
+      <div className="relative h-40 w-full shrink-0 bg-[#1B2432]">
         <RouteMapView
           points={routePoints}
           center={currentCoord}
@@ -305,12 +305,12 @@ export function OutdoorRunTracker({
       </div>
 
       {/* Live Apple Fitness Stopwatch HUD */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col justify-between gap-4">
-        <div className="rounded-3xl bg-[#1C1C1E] border border-white/8 p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="rounded-3xl bg-[#1C1C1E] border border-white/8 p-3.5 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-xs text-[#D1D1D6]">Duración del entrenamiento</p>
-              <p className="font-mono-nums text-5xl font-bold text-[#FFE620] tracking-tight leading-none mt-1">
+              <p className="font-mono-nums text-4xl font-bold text-[#FFE620] tracking-tight leading-none mt-1">
                 {formatStopwatchDuration(elapsedSec)}
               </p>
             </div>
@@ -331,28 +331,28 @@ export function OutdoorRunTracker({
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-y-3.5 gap-x-3 pt-1 border-t border-white/8">
+          <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 pt-1 border-t border-white/8">
             <div>
               <p className="text-xs text-[#D1D1D6]">Distancia</p>
-              <p className="font-mono-nums text-2xl font-bold text-[#0A95FF]">
+              <p className="font-mono-nums text-xl font-bold text-[#0A95FF]">
                 {unit === 'MI' ? `${distanceMiles.toFixed(2)} MI` : `${distanceKm.toFixed(2)} KM`}
               </p>
             </div>
             <div>
               <p className="text-xs text-[#D1D1D6]">Calorías activas</p>
-              <p className="font-mono-nums text-2xl font-bold text-[#FA114F]">
+              <p className="font-mono-nums text-xl font-bold text-[#FA114F]">
                 {calories.active} CAL
               </p>
             </div>
             <div>
               <p className="text-xs text-[#D1D1D6]">Calorías en total</p>
-              <p className="font-mono-nums text-2xl font-bold text-[#FA114F]">
+              <p className="font-mono-nums text-xl font-bold text-[#FA114F]">
                 {calories.total} CAL
               </p>
             </div>
             <div>
               <p className="text-xs text-[#D1D1D6]">Altitud</p>
-              <p className="font-mono-nums text-2xl font-bold text-[#9CE819]">
+              <p className="font-mono-nums text-xl font-bold text-[#9CE819]">
                 {unit === 'MI'
                   ? `${altitudeFeet} PIES`
                   : `${Math.round(altitudeFeet / 3.28084)} M`}
@@ -363,7 +363,7 @@ export function OutdoorRunTracker({
           <div className="pt-1 border-t border-white/8 flex items-center justify-between">
             <div>
               <p className="text-xs text-[#D1D1D6]">Ritmo prom.</p>
-              <p className="font-mono-nums text-xl font-bold text-[#5AC8FA]">
+              <p className="font-mono-nums text-lg font-bold text-[#5AC8FA]">
                 {paceText}
               </p>
             </div>
@@ -381,52 +381,55 @@ export function OutdoorRunTracker({
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Apple Fitness Action Controls */}
-        <div className="space-y-2.5 pb-1">
-          {status === 'ready' ? (
+      {/* Pinned Apple Fitness Action Controls (always visible above home indicator) */}
+      <div
+        className="shrink-0 px-4 pt-2.5 bg-black/95 border-t border-white/8"
+        style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom, 16px))' }}
+      >
+        {status === 'ready' ? (
+          <button
+            type="button"
+            onClick={handleStart}
+            className="w-full min-h-[54px] rounded-2xl bg-[#9CE819] text-black font-display font-bold text-base flex items-center justify-center gap-2 cursor-pointer hover:brightness-105 active:scale-[0.98] transition-all shadow-lg shadow-[#9CE819]/25"
+          >
+            <Play className="w-5 h-5 fill-current" />
+            <span>Iniciar {activity === 'Carrera al aire libre' ? 'carrera' : 'caminata'}</span>
+          </button>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={handleStart}
-              className="w-full min-h-[54px] rounded-2xl bg-[#9CE819] text-black font-display font-bold text-base flex items-center justify-center gap-2 cursor-pointer hover:brightness-105"
+              onClick={() => setStatus(status === 'running' ? 'paused' : 'running')}
+              className={`min-h-[52px] rounded-2xl font-display font-bold text-sm flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] transition-all ${
+                status === 'running'
+                  ? 'bg-[#FFE620] text-black'
+                  : 'bg-[#9CE819] text-black'
+              }`}
             >
-              <Play className="w-5 h-5 fill-current" />
-              <span>Iniciar {activity === 'Carrera al aire libre' ? 'carrera' : 'caminata'}</span>
+              {status === 'running' ? (
+                <>
+                  <Pause className="w-4.5 h-4.5 fill-current" />
+                  <span>Pausar</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-4.5 h-4.5 fill-current" />
+                  <span>Reanudar</span>
+                </>
+              )}
             </button>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setStatus(status === 'running' ? 'paused' : 'running')}
-                className={`min-h-[52px] rounded-2xl font-display font-bold text-sm flex items-center justify-center gap-2 cursor-pointer ${
-                  status === 'running'
-                    ? 'bg-[#FFE620] text-black'
-                    : 'bg-[#9CE819] text-black'
-                }`}
-              >
-                {status === 'running' ? (
-                  <>
-                    <Pause className="w-4.5 h-4.5 fill-current" />
-                    <span>Pausar</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4.5 h-4.5 fill-current" />
-                    <span>Reanudar</span>
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={handleFinishAndSave}
-                className="min-h-[52px] rounded-2xl bg-[#FA114F] text-white font-display font-bold text-sm flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Square className="w-4 h-4 fill-current" />
-                <span>Finalizar</span>
-              </button>
-            </div>
-          )}
-        </div>
+            <button
+              type="button"
+              onClick={handleFinishAndSave}
+              className="min-h-[52px] rounded-2xl bg-[#FA114F] text-white font-display font-bold text-sm flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] transition-all"
+            >
+              <Square className="w-4 h-4 fill-current" />
+              <span>Finalizar</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
