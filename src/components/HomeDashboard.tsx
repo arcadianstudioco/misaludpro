@@ -415,10 +415,13 @@ export function HomeDashboard({
                 className="transition-all duration-700 ease-out"
               />
             </svg>
-            {/* Center Arrow pointer */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <span className="text-[#FA114F] text-lg font-black transform -rotate-45">
-                →
+            {/* Center Percentage Display */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="font-mono-nums text-lg font-black text-white leading-none">
+                {ringPercent}%
+              </span>
+              <span className="text-[9px] font-semibold text-[#8E9D93] uppercase tracking-wider mt-0.5">
+                Cerrado
               </span>
             </div>
           </div>

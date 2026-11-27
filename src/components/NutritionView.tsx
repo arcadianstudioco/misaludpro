@@ -24,6 +24,7 @@ import {
 } from '../types/health';
 import { FOOD_CATALOG, FoodCatalogItem } from '../data/seedData';
 import { ProgressRing } from './ProgressRing';
+import { estimateNutritionFromFoodName, FoodEstimate } from '../utils/foodIntelligence';
 
 interface NutritionViewProps {
   profile: UserProfile;
@@ -110,6 +111,23 @@ export function NutritionView({
   const [calcFat, setCalcFat] = useState('12');
   const [calcCal, setCalcCal] = useState('388');
   const [calcAutoKcal, setCalcAutoKcal] = useState(true);
+  const [smartSuggestion, setSmartSuggestion] = useState<FoodEstimate | null>(null);
+
+  // Auto-detect macros and calories when user types a food name
+  const handleFoodNameChange = (name: string) => {
+    setCalcName(name);
+    const estimate = estimateNutritionFromFoodName(name);
+    if (estimate) {
+      setSmartSuggestion(estimate);
+      setCalcPro(String(estimate.proteinG));
+      setCalcCarbs(String(estimate.carbsG));
+      setCalcFat(String(estimate.fatG));
+      setCalcCal(String(estimate.calories));
+      setCalcAutoKcal(true);
+    } else {
+      setSmartSuggestion(null);
+    }
+  };
 
   // AI Photo Scanner state
   const [photoScanning, setPhotoScanning] = useState(false);
@@ -681,13 +699,26 @@ export function NutritionView({
             {/* TAB 2: MANUAL */}
             {activeModalTab === 'manual' && (
               <form onSubmit={handleManualSubmit} className="space-y-3.5">
-                <input
-                  type="text"
-                  value={calcName}
-                  onChange={(e) => setCalcName(e.target.value)}
-                  placeholder="Nombre de la comida (ej. Bowl casero de atún)"
-                  className="w-full min-h-[42px] px-3.5 rounded-2xl bg-black/40 border border-white/10 text-xs text-white placeholder:text-[#6E7C73] outline-none focus:border-[#74D834]/50"
-                />
+                <div>
+                  <input
+                    type="text"
+                    value={calcName}
+                    onChange={(e) => handleFoodNameChange(e.target.value)}
+                    placeholder="Nombre (ej. Pollo, Arroz, 2 Huevos, Avena, Salmón...)"
+                    className="w-full min-h-[42px] px-3.5 rounded-2xl bg-black/40 border border-white/10 text-xs text-white placeholder:text-[#6E7C73] outline-none focus:border-[#74D834]/50"
+                  />
+                  {smartSuggestion && (
+                    <div className="mt-1.5 px-3 py-1.5 rounded-xl bg-[#74D834]/15 border border-[#74D834]/30 flex items-center justify-between text-[11px] text-[#74D834] animate-fadeIn">
+                      <span className="flex items-center gap-1 font-medium truncate">
+                        <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                        <span>Autodetectado: <strong>{smartSuggestion.matchedKeyword}</strong></span>
+                      </span>
+                      <span className="font-mono-nums font-bold shrink-0 ml-2">
+                        {smartSuggestion.calories} kcal
+                      </span>
+                    </div>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="apple-glass-pill rounded-2xl p-3 space-y-1">
