@@ -382,7 +382,8 @@ export default function App() {
         )}
 
         {activeTab === 'inicio' && (
-          <HomeDashboard
+          <div key="tab-inicio" className="tab-enter">
+            <HomeDashboard
             profile={state.profile}
             habits={todayHabits}
             streaks={habitStreaks}
@@ -421,84 +422,93 @@ export default function App() {
             onAddManualSession={completeWorkoutSession}
             onDeleteSession={deleteWorkoutSession}
           />
+          </div>
         )}
 
         {activeTab === 'rutinas' && (
-          <RoutinesView
-            routines={state.routines}
-            sessions={state.workoutSessions}
-            userWeightKg={currentWeightKg}
-            autoLaunchOutdoor={autoLaunchOutdoor}
-            onClearAutoLaunch={() => setAutoLaunchOutdoor(null)}
-            onCompleteSession={completeWorkoutSession}
-            onToggleMyRoutine={toggleRoutineInMyList}
-            onOpenKegelGuide={() => setShowHealthSubView(true)}
-            onExportPdf={handleExportPlanPdf}
-          />
+          <div key="tab-rutinas" className="tab-enter">
+            <RoutinesView
+              routines={state.routines}
+              sessions={state.workoutSessions}
+              userWeightKg={currentWeightKg}
+              autoLaunchOutdoor={autoLaunchOutdoor}
+              onClearAutoLaunch={() => setAutoLaunchOutdoor(null)}
+              onCompleteSession={completeWorkoutSession}
+              onToggleMyRoutine={toggleRoutineInMyList}
+              onOpenKegelGuide={() => setShowHealthSubView(true)}
+              onExportPdf={handleExportPlanPdf}
+            />
+          </div>
         )}
 
         {activeTab === 'nutricion' && (
-          <NutritionView
-            profile={state.profile}
-            todayMeals={todayMeals}
-            totals={nutritionTotals}
-            shoppingList={state.shoppingList}
-            onAddMeal={addMeal}
-            onToggleMeal={toggleMealCompleted}
-            onDeleteMeal={deleteMeal}
-            onToggleShoppingItem={toggleShoppingItem}
-            onAddShoppingItem={addShoppingItem}
-            onExportPdf={handleExportPlanPdf}
-          />
+          <div key="tab-nutricion" className="tab-enter">
+            <NutritionView
+              profile={state.profile}
+              todayMeals={todayMeals}
+              totals={nutritionTotals}
+              shoppingList={state.shoppingList}
+              onAddMeal={addMeal}
+              onToggleMeal={toggleMealCompleted}
+              onDeleteMeal={deleteMeal}
+              onToggleShoppingItem={toggleShoppingItem}
+              onAddShoppingItem={addShoppingItem}
+              onExportPdf={handleExportPlanPdf}
+            />
+          </div>
         )}
 
         {activeTab === 'estadisticas' && (
-          <StatsView
-            todayDate={today}
-            measurements={state.measurements}
-            progressPhotos={state.progressPhotos}
-            meals={state.meals}
-            workoutSessions={state.workoutSessions}
-            habitsByDate={state.habitsByDate}
-            dailyNotes={dailyNotes}
-            heightCm={state.profile.heightCm}
-            age={state.profile.age}
-            onAddMeasurement={addBodyMeasurement}
-            onAddPhoto={addProgressPhoto}
-            onDeletePhoto={deleteProgressPhoto}
-            onSaveDailyNote={saveDailyNote}
-            goal={state.profile.goal}
-            targetWeightKg={state.profile.targetWeightKg}
-            calorieTargetMin={state.profile.calorieTargetMin}
-            calorieTargetMax={state.profile.calorieTargetMax}
-            onAddManualSession={completeWorkoutSession}
-            onDeleteSession={deleteWorkoutSession}
-          />
+          <div key="tab-estadisticas" className="tab-enter">
+            <StatsView
+              todayDate={today}
+              measurements={state.measurements}
+              progressPhotos={state.progressPhotos}
+              meals={state.meals}
+              workoutSessions={state.workoutSessions}
+              habitsByDate={state.habitsByDate}
+              dailyNotes={dailyNotes}
+              heightCm={state.profile.heightCm}
+              age={state.profile.age}
+              onAddMeasurement={addBodyMeasurement}
+              onAddPhoto={addProgressPhoto}
+              onDeletePhoto={deleteProgressPhoto}
+              onSaveDailyNote={saveDailyNote}
+              goal={state.profile.goal}
+              targetWeightKg={state.profile.targetWeightKg}
+              calorieTargetMin={state.profile.calorieTargetMin}
+              calorieTargetMax={state.profile.calorieTargetMax}
+              onAddManualSession={completeWorkoutSession}
+              onDeleteSession={deleteWorkoutSession}
+            />
+          </div>
         )}
 
         {activeTab === 'perfil' && (
-          <ProfileView
-            profile={state.profile}
-            authUser={authUser}
-            currentWeightKg={currentWeightKg}
-            reminders={state.reminders}
-            theme={theme}
-            syncStatus={syncStatus}
-            pendingSyncCount={pendingSyncCount}
-            lastSyncedAt={lastSyncedAt}
-            isOnline={isOnline}
-            isSimulatedOffline={isSimulatedOffline}
-            onToggleSimulatedOffline={toggleSimulatedOffline}
-            onManualSync={manualSync}
-            onSetTheme={setTheme}
-            onUpdateProfile={updateProfile}
-            onUpdateReminders={updateReminders}
-            onChangePassword={changePassword}
-            onExportPlanPdf={handleExportPlanPdf}
-            onExportJson={exportAllDataJson}
-            onSignOut={signOut}
-            onDeleteAccount={() => void deleteAccountAndData()}
-          />
+          <div key="tab-perfil" className="tab-enter">
+            <ProfileView
+              profile={state.profile}
+              authUser={authUser}
+              currentWeightKg={currentWeightKg}
+              reminders={state.reminders}
+              theme={theme}
+              syncStatus={syncStatus}
+              pendingSyncCount={pendingSyncCount}
+              lastSyncedAt={lastSyncedAt}
+              isOnline={isOnline}
+              isSimulatedOffline={isSimulatedOffline}
+              onToggleSimulatedOffline={toggleSimulatedOffline}
+              onManualSync={manualSync}
+              onSetTheme={setTheme}
+              onUpdateProfile={updateProfile}
+              onUpdateReminders={updateReminders}
+              onChangePassword={changePassword}
+              onExportPlanPdf={handleExportPlanPdf}
+              onExportJson={exportAllDataJson}
+              onSignOut={signOut}
+              onDeleteAccount={() => void deleteAccountAndData()}
+            />
+          </div>
         )}
       </>
     );

@@ -107,6 +107,24 @@ textarea {
 }
 
 /* ==========================================================================
+   Tab Transition – Apple-style slide-up fade
+   ========================================================================== */
+@keyframes tabEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.993);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.tab-enter {
+  animation: tabEnter 0.26s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+/* ==========================================================================
    Apple Liquid Glass Design System
    ========================================================================== */
 .apple-glass,
