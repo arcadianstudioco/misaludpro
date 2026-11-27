@@ -391,7 +391,7 @@ export default function App() {
             onToggleSimulatedOffline={toggleSimulatedOffline}
             onManualSync={manualSync}
             onUpdateHabit={updateHabit}
-            onQuickLogWeightWaist={(weightKg, waistCm) =>
+            onQuickLogWeightWaist={(weightKg: number, waistCm: number) =>
               addBodyMeasurement({
                 weightKg,
                 waistCm,

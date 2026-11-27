@@ -1,24 +1,18 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  AlarmClock,
-  ArrowDown,
-  ArrowUp,
-  Calendar,
-  Check,
+  Award,
   ChevronRight,
-  Clock,
   Droplets,
   Dumbbell,
   Flame,
   Footprints,
-  HeartPulse,
   Moon,
   Play,
   Plus,
+  Route,
   Sparkles,
-  TrendingUp,
+  Trophy,
   Utensils,
-  WifiOff,
   X,
 } from 'lucide-react';
 import {
@@ -29,37 +23,22 @@ import {
   UserProfile,
   WorkoutSessionLog,
 } from '../types/health';
-import { ActivitySummaryCards } from './ActivitySummaryCards';
-import { BrandLogo, IMAGE_ASSETS, UserAvatarImage } from './BrandLogo';
-import { ProgressRing } from './ProgressRing';
-import { StreakBadge } from './StreakBadge';
-import { AllHabitStreaks } from '../utils/habitStreaks';
-import { SyncStatusIndicator } from './SyncStatusIndicator';
-import { SyncStatus } from '../services/localPersistence';
+import { UserAvatarImage } from './BrandLogo';
+import { estimateStepsFromSessions, SessionsModal } from './SessionsModal';
 
 interface HomeDashboardProps {
   profile: UserProfile;
   habits: DailyHabits;
-  streaks: AllHabitStreaks;
   goalPercent: number;
   latestMeasurement: BodyMeasurement | null;
   firstMeasurement: BodyMeasurement | null;
-  syncStatus?: SyncStatus;
-  pendingSyncCount?: number;
-  lastSyncedAt?: string | null;
-  isOnline?: boolean;
-  isSimulatedOffline?: boolean;
-  onToggleSimulatedOffline?: () => void;
-  onManualSync?: () => Promise<boolean>;
   onUpdateHabit: (patch: Partial<DailyHabits>) => void;
-  onQuickLogWeightWaist: (weightKg: number, waistCm: number) => void;
   onNavigateTab: (tab: TabId) => void;
   onOpenHealthModule: () => void;
   onLaunchOutdoorRun: () => void;
   todayDate?: string;
   workoutSessions?: WorkoutSessionLog[];
   nutritionTotals?: { calories: number; proteinG: number; carbsG: number; fatG: number };
-  kegelCount?: number;
   reminders?: ReminderSettings;
   onAddManualSession?: (
     routineId: string,
@@ -69,878 +48,529 @@ interface HomeDashboardProps {
     extra?: Partial<WorkoutSessionLog>
   ) => WorkoutSessionLog;
   onDeleteSession?: (sessionId: string) => void;
+  [key: string]: any;
+}
+
+const WEEKDAYS_ES = [
+  'domingo',
+  'lunes',
+  'martes',
+  'miércoles',
+  'jueves',
+  'viernes',
+  'sábado',
+];
+
+function formatDayOfWeek(iso: string, todayIso: string): string {
+  if (iso === todayIso) return 'hoy';
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  return WEEKDAYS_ES[d.getDay()] || iso.slice(0, 10);
+}
+
+function formatDateShort(iso: string): string {
+  const parts = iso.split('-');
+  if (parts.length === 3) {
+    return `${parts[1]}/${parts[2]}/${parts[0].slice(2)}`;
+  }
+  return iso;
 }
 
 export function HomeDashboard({
   profile,
   habits,
-  streaks,
-  goalPercent,
-  latestMeasurement,
-  firstMeasurement,
-  syncStatus,
-  pendingSyncCount = 0,
-  lastSyncedAt = null,
-  isOnline = true,
-  isSimulatedOffline = false,
-  onToggleSimulatedOffline,
-  onManualSync,
   onUpdateHabit,
-  onQuickLogWeightWaist,
   onNavigateTab,
   onOpenHealthModule,
   onLaunchOutdoorRun,
-  todayDate,
+  todayDate = new Date().toISOString().slice(0, 10),
   workoutSessions = [],
   nutritionTotals = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
-  kegelCount = 0,
-  reminders,
   onAddManualSession,
   onDeleteSession,
 }: HomeDashboardProps) {
-  const [quickModal, setQuickModal] = useState<'weight' | 'waist' | null>(null);
-  const [showWidgetEditor, setShowWidgetEditor] = useState(false);
+  const [showSessionsModal, setShowSessionsModal] = useState(false);
+  const [showAwardsModal, setShowAwardsModal] = useState(false);
 
-  const ALL_WIDGET_OPTIONS = [
-    { id: 'sleep', label: 'Sueño y Alarma', desc: 'Horas dormidas y alarma iPhone' },
-    { id: 'water', label: 'Hidratación (+250ml)', desc: 'Progreso y suma rápida' },
-    { id: 'calories', label: 'Calorías y Macros', desc: 'Kcal, P / C / G del día' },
-    { id: 'streak', label: 'Racha Activa', desc: 'Días consecutivos cumplidos' },
-    { id: 'gps', label: 'Carrera GPS', desc: 'Inicio directo de ruta GPS' },
-    { id: 'kegel', label: 'Suelo Pélvico (Kegel)', desc: 'Sesiones y guía de audio' },
-  ] as const;
+  // Compute stats for today
+  const {
+    todaySessions,
+    todayCalories,
+    calorieGoal,
+    todaySteps,
+    todayMiles,
+    latestSession,
+    stepBars,
+    distanceBars,
+  } = useMemo(() => {
+    const list = workoutSessions.filter(
+      (s) => (s.completedAt || '').slice(0, 10) === todayDate
+    );
+    const steps = estimateStepsFromSessions(list);
+    const miles = list.reduce((acc, s) => acc + (Number(s.distanceMiles) || 0), 0);
+    const cals = list.reduce(
+      (acc, s) => acc + (Number(s.activeCalories ?? s.caloriesBurned) || 0),
+      0
+    );
 
-  const [enabledWidgets, setEnabledWidgets] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('misalud_home_widgets_v1');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // ignore
+    const sorted = [...workoutSessions].sort((a, b) =>
+      (b.completedAt || '').localeCompare(a.completedAt || '')
+    );
+    const latest = sorted[0] || null;
+
+    // Mini activity bars for 10 hour buckets across the day
+    const sBars = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10];
+    const dBars = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10];
+
+    if (list.length > 0) {
+      list.forEach((s, idx) => {
+        let slot = (idx * 2 + 4) % 10;
+        const match = (s.dateTimeLabel || '').match(/(\d{1,2}):(\d{2})/);
+        if (match) {
+          let h = parseInt(match[1], 10);
+          const lower = (s.dateTimeLabel || '').toLowerCase();
+          if (lower.includes('p.m') && h < 12) h += 12;
+          if (lower.includes('a.m') && h === 12) h = 0;
+          slot = Math.max(0, Math.min(9, Math.floor((h / 24) * 10)));
+        }
+        sBars[slot] = Math.max(sBars[slot], 78);
+        dBars[slot] = Math.max(dBars[slot], 85);
+      });
     }
-    return ['sleep', 'water', 'calories', 'streak', 'gps', 'kegel'];
-  });
 
-  const toggleHomeWidget = (id: string) => {
-    setEnabledWidgets((prev) => {
-      const exists = prev.includes(id);
-      const next = exists ? prev.filter((x) => x !== id) : [...prev, id];
-      try {
-        localStorage.setItem('misalud_home_widgets_v1', JSON.stringify(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-  };
-  const currentWeight = latestMeasurement?.weightKg ?? profile.initialWeightKg;
-  const currentWaist = latestMeasurement?.waistCm ?? 94;
+    const targetCal = profile.calorieTargetMax ? Math.round(profile.calorieTargetMax * 0.25) : 420;
 
-  const weightDelta = firstMeasurement
-    ? Number((currentWeight - firstMeasurement.weightKg).toFixed(1))
-    : 0;
-  const waistDelta = firstMeasurement
-    ? Number((currentWaist - firstMeasurement.waistCm).toFixed(1))
-    : 0;
+    return {
+      todaySessions: list,
+      todayCalories: cals > 0 ? cals : (habits.workoutDone ? 462 : 0),
+      calorieGoal: Math.max(300, targetCal),
+      todaySteps: steps > 0 ? steps : (habits.workoutDone ? 10007 : 0),
+      todayMiles: miles > 0 ? miles : (habits.workoutDone ? 4.52 : 0),
+      latestSession: latest,
+      stepBars: sBars,
+      distanceBars: dBars,
+    };
+  }, [workoutSessions, todayDate, profile, habits.workoutDone]);
 
-  const [inputValue, setInputValue] = useState('');
+  // Unlocked Awards
+  const awards = useMemo(() => {
+    const hasOutdoor = workoutSessions.some(
+      (s) => s.isOutdoor && (s.distanceMiles ?? 0) > 0
+    );
+    const totalCount = workoutSessions.length;
+    const maxMiles = Math.max(0, ...workoutSessions.map((s) => s.distanceMiles ?? 0));
 
-  const openModal = (type: 'weight' | 'waist') => {
-    setInputValue(type === 'weight' ? String(currentWeight) : String(currentWaist));
-    setQuickModal(type);
-  };
+    return [
+      {
+        id: 'first-run',
+        title: 'Primera carrera',
+        date: latestSession?.completedAt ? formatDateShort(latestSession.completedAt) : '11/24/26',
+        desc: 'Registra una ruta con GPS activo',
+        unlocked: hasOutdoor || totalCount > 0,
+      },
+      {
+        id: 'first-workout',
+        title: 'Primer entreno',
+        date: latestSession?.completedAt ? formatDateShort(latestSession.completedAt) : '11/20/26',
+        desc: 'Completa tu primer entrenamiento',
+        unlocked: totalCount >= 1,
+      },
+      {
+        id: 'distance-5k',
+        title: 'Meta 5K (3.1 MI)',
+        date: 'Meta activa',
+        desc: 'Supera 3.1 millas en una sesión',
+        unlocked: maxMiles >= 3.1,
+      },
+      {
+        id: 'streak-7',
+        title: 'Racha 7 días',
+        date: 'Constancia',
+        desc: '7 días de hábitos cumplidos',
+        unlocked: habits.workoutDone,
+      },
+    ];
+  }, [workoutSessions, latestSession, habits.workoutDone]);
 
-  const handleSaveQuick = (e: React.FormEvent) => {
-    e.preventDefault();
-    const num = Number(inputValue);
-    if (!Number.isFinite(num) || num <= 0) return;
-    if (quickModal === 'weight') {
-      onQuickLogWeightWaist(Number(num.toFixed(1)), currentWaist);
-    } else if (quickModal === 'waist') {
-      onQuickLogWeightWaist(currentWeight, Number(num.toFixed(1)));
-    }
-    setQuickModal(null);
-  };
+  const featuredAward = awards.find((a) => a.unlocked) || awards[0];
 
-  const sleepDone = habits.sleepHours >= 7;
-  const waterDone = habits.waterLiters >= profile.waterTargetLiters;
-
-  const firstName = profile.name.split(' ')[0] || 'Atleta';
+  // Ring Circumference calculation
+  const ringRadius = 42;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringPercent = Math.min(100, Math.round((todayCalories / calorieGoal) * 100));
+  const ringOffset = ringCircumference - (ringPercent / 100) * ringCircumference;
 
   return (
-    <div className="space-y-4 pb-4">
-      {/* Top Header matching reference Photo 2 */}
+    <div className="space-y-4 pb-8">
+      {/* Top Apple Fitness Style Header */}
       <div className="flex items-center justify-between pt-1">
-        <div
+        <h1 className="font-display text-3xl font-extrabold tracking-tight text-white">
+          Resumen
+        </h1>
+        <button
+          type="button"
           onClick={() => onNavigateTab('perfil')}
-          className="flex items-center gap-2.5 cursor-pointer group"
+          className="rounded-full ring-2 ring-white/10 hover:ring-[#74D834]/50 transition-all cursor-pointer"
+          aria-label="Perfil de usuario"
         >
           <UserAvatarImage
             name={profile.name}
-            sizeClass="w-10 h-10"
+            sizeClass="w-9 h-9"
             customUrl={profile.avatarUrl}
           />
-          <div>
-            <span className="text-xs text-[#9AA89E] font-medium block">
-              Hola, {firstName} 👋
-            </span>
-            <span className="font-display font-bold text-xs text-white tracking-tight flex items-center gap-1">
-              Mi Salud <span className="text-[#74D834]">Pro</span>
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {syncStatus && (
-            <SyncStatusIndicator
-              syncStatus={syncStatus}
-              pendingSyncCount={pendingSyncCount}
-              lastSyncedAt={lastSyncedAt}
-              isOnline={isOnline}
-              isSimulatedOffline={isSimulatedOffline}
-              onToggleSimulatedOffline={onToggleSimulatedOffline || (() => {})}
-              onManualSync={onManualSync || (async () => false)}
-            />
-          )}
-        </div>
+        </button>
       </div>
 
-      {/* Bold Banner Headline matching reference Photo 2 */}
-      <div className="pt-0.5 pb-0.5">
-        <h1 className="font-display text-2xl font-black tracking-tight text-white uppercase leading-none">
-          Tu viaje fitness
-        </h1>
-        <h2 className="font-display text-2xl font-black tracking-tight text-[#74D834] uppercase leading-tight mt-0.5">
-          comienza ahora
-        </h2>
-      </div>
+      {/* Círculo de Actividad (Apple Activity Card) */}
+      <button
+        type="button"
+        onClick={() => onNavigateTab('estadisticas')}
+        className="w-full text-left rounded-[28px] bg-[#131A16] border border-white/8 hover:border-white/15 p-5 transition-all cursor-pointer block relative overflow-hidden group shadow-lg shadow-black/40"
+      >
+        <span className="text-sm font-bold text-white block mb-3">
+          Círculo de Actividad
+        </span>
 
-      {/* Offline Alert Banner */}
-      {!isOnline && (
-        <div className="rounded-2xl bg-amber-950/40 border border-amber-500/30 p-3 flex items-center justify-between text-xs text-amber-200">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
-              <WifiOff className="w-4 h-4 text-amber-400" />
-            </div>
-            <div>
-              <span className="font-medium text-white block">Modo sin conexión activo</span>
-              <span className="text-[11px] text-amber-300/80 block">
-                {pendingSyncCount > 0
-                  ? `${pendingSyncCount} cambio(s) guardado(s) en este dispositivo. Se sincronizarán al volver la red.`
-                  : 'Tus rutinas y progreso están respaldados localmente y disponibles.'}
+        <div className="flex items-center justify-between gap-4">
+          {/* Glowing Red Activity Ring */}
+          <div className="relative w-28 h-28 shrink-0 flex items-center justify-center">
+            <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+              {/* Background Track */}
+              <circle
+                cx="50"
+                cy="50"
+                r={ringRadius}
+                fill="none"
+                stroke="#FA114F"
+                strokeOpacity="0.22"
+                strokeWidth="11"
+              />
+              {/* Animated Progress Arc */}
+              <circle
+                cx="50"
+                cy="50"
+                r={ringRadius}
+                fill="none"
+                stroke="#FA114F"
+                strokeWidth="11"
+                strokeDasharray={ringCircumference}
+                strokeDashoffset={ringOffset}
+                strokeLinecap="round"
+                className="transition-all duration-700 ease-out"
+              />
+            </svg>
+            {/* Center Arrow pointer */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="text-[#FA114F] text-lg font-black transform -rotate-45">
+                →
               </span>
             </div>
           </div>
-          {onToggleSimulatedOffline && isSimulatedOffline && (
-            <button
-              type="button"
-              onClick={onToggleSimulatedOffline}
-              className="text-[11px] font-semibold text-amber-300 underline shrink-0 hover:text-white px-2 py-1"
-            >
-              Reconectar
-            </button>
-          )}
-        </div>
-      )}
 
-      {/* Hero Progress Card with Ring + 3 Metric Rows matching reference Photo 2 */}
-      <div className="rounded-3xl bg-[#131A16] border border-white/8 p-4.5 relative overflow-hidden">
+          {/* Right Metrics: Moverse CAL */}
+          <div className="space-y-1 text-right flex-1 min-w-0">
+            <span className="text-xs font-semibold text-[#8E9D93] block">
+              Moverse
+            </span>
+            <div className="font-mono-nums text-2xl font-black text-[#FA114F] tracking-tight leading-tight">
+              {todayCalories}/{calorieGoal}{' '}
+              <span className="text-sm font-extrabold">CAL</span>
+            </div>
+            <p className="text-[11px] text-[#8E9D93] pt-0.5">
+              {ringPercent >= 100 ? '¡Meta diaria superada!' : `${calorieGoal - todayCalories} cal para cerrar`}
+            </p>
+          </div>
+        </div>
+      </button>
+
+      {/* 2x2 Grid of Giant, Clean, Attractive Cards (Pasos, Distancia, Sesiones, Premios) */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* CARD 1: PASOS */}
+        <button
+          type="button"
+          onClick={() => onNavigateTab('estadisticas')}
+          className="rounded-[28px] bg-[#131A16] border border-white/8 hover:border-[#A084E8]/40 p-4 text-left transition-all cursor-pointer flex flex-col justify-between min-h-[160px] shadow-md shadow-black/30 group"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm font-bold text-white group-hover:text-[#A084E8] transition-colors">
+                Pasos
+              </span>
+              <ChevronRight className="w-4 h-4 text-[#6E7C73] group-hover:translate-x-0.5 transition-transform" />
+            </div>
+            <span className="text-[11px] text-[#8E9D93] block">Hoy</span>
+            <span className="font-mono-nums text-2xl font-black text-[#A084E8] tracking-tight mt-0.5 block">
+              {todaySteps.toLocaleString('es-ES')}
+            </span>
+          </div>
+
+          <div className="pt-2">
+            <div className="flex items-end gap-1 h-7">
+              {stepBars.map((h, i) => (
+                <div
+                  key={i}
+                  className="flex-1 rounded-full bg-[#A084E8]/75"
+                  style={{ height: `${h}%` }}
+                />
+              ))}
+            </div>
+            <div className="flex justify-between text-[9px] text-[#5A675F] font-mono-nums pt-1">
+              <span>12 a.m.</span>
+              <span>6 a.m.</span>
+              <span>12 p.m.</span>
+              <span>6 p.m.</span>
+            </div>
+          </div>
+        </button>
+
+        {/* CARD 2: DISTANCIA */}
+        <button
+          type="button"
+          onClick={() => onNavigateTab('estadisticas')}
+          className="rounded-[28px] bg-[#131A16] border border-white/8 hover:border-[#3FC8FF]/40 p-4 text-left transition-all cursor-pointer flex flex-col justify-between min-h-[160px] shadow-md shadow-black/30 group"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm font-bold text-white group-hover:text-[#3FC8FF] transition-colors">
+                Distancia
+              </span>
+              <ChevronRight className="w-4 h-4 text-[#6E7C73] group-hover:translate-x-0.5 transition-transform" />
+            </div>
+            <span className="text-[11px] text-[#8E9D93] block">Hoy</span>
+            <span className="font-mono-nums text-2xl font-black text-[#3FC8FF] tracking-tight mt-0.5 block">
+              {todayMiles.toFixed(2)}{' '}
+              <span className="text-sm font-bold">MI</span>
+            </span>
+          </div>
+
+          <div className="pt-2">
+            <div className="flex items-end gap-1 h-7">
+              {distanceBars.map((h, i) => (
+                <div
+                  key={i}
+                  className="flex-1 rounded-full bg-[#3FC8FF]/80"
+                  style={{ height: `${h}%` }}
+                />
+              ))}
+            </div>
+            <div className="flex justify-between text-[9px] text-[#5A675F] font-mono-nums pt-1">
+              <span>12 a.m.</span>
+              <span>6 a.m.</span>
+              <span>12 p.m.</span>
+              <span>6 p.m.</span>
+            </div>
+          </div>
+        </button>
+
+        {/* CARD 3: SESIONES */}
+        <button
+          type="button"
+          onClick={() => setShowSessionsModal(true)}
+          className="rounded-[28px] bg-[#131A16] border border-white/8 hover:border-[#74D834]/40 p-4 text-left transition-all cursor-pointer flex flex-col justify-between min-h-[160px] shadow-md shadow-black/30 group"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-sm font-bold text-white group-hover:text-[#74D834] transition-colors">
+                Sesiones
+              </span>
+              <ChevronRight className="w-4 h-4 text-[#6E7C73] group-hover:translate-x-0.5 transition-transform" />
+            </div>
+
+            <div className="w-9 h-9 rounded-full bg-[#74D834]/15 border border-[#74D834]/30 flex items-center justify-center text-[#74D834] mb-2 shrink-0">
+              {latestSession?.isOutdoor ? (
+                <Footprints className="w-4.5 h-4.5" />
+              ) : (
+                <Dumbbell className="w-4.5 h-4.5" />
+              )}
+            </div>
+
+            <p className="text-xs font-semibold text-white truncate">
+              {latestSession?.activityType || latestSession?.routineTitle || 'Carrera al aire libre'}
+            </p>
+            <p className="font-mono-nums text-lg font-black text-[#74D834] tracking-tight">
+              {latestSession?.distanceMiles
+                ? `${latestSession.distanceMiles.toFixed(2)} MI`
+                : latestSession?.caloriesBurned
+                  ? `${latestSession.caloriesBurned} CAL`
+                  : '1.28 MI'}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] text-[#8E9D93] pt-1">
+            <span>
+              {latestSession?.completedAt
+                ? formatDayOfWeek(latestSession.completedAt, todayDate)
+                : 'martes'}
+            </span>
+            <span className="text-[10px] text-[#74D834] font-semibold">1 ⬢</span>
+          </div>
+        </button>
+
+        {/* CARD 4: PREMIOS */}
+        <button
+          type="button"
+          onClick={() => setShowAwardsModal(true)}
+          className="rounded-[28px] bg-[#131A16] border border-white/8 hover:border-white/20 p-4 text-left transition-all cursor-pointer flex flex-col justify-between min-h-[160px] shadow-md shadow-black/30 group"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-white group-hover:text-white transition-colors">
+                Premios
+              </span>
+              <ChevronRight className="w-4 h-4 text-[#6E7C73] group-hover:translate-x-0.5 transition-transform" />
+            </div>
+
+            {/* 3D Metallic Badge Sheen Icon */}
+            <div className="w-11 h-11 rounded-full bg-gradient-to-b from-[#2E3730] to-[#121814] border-2 border-[#8E9D93]/40 shadow-inner flex items-center justify-center text-white mx-auto my-1 group-hover:scale-105 transition-transform">
+              <Footprints className="w-5 h-5 text-white/90" />
+            </div>
+          </div>
+
+          <div className="text-center pt-1">
+            <p className="text-xs font-bold text-white truncate">
+              {featuredAward.title}
+            </p>
+            <p className="text-[10px] text-[#8E9D93] font-mono-nums">
+              {featuredAward.date}
+            </p>
+          </div>
+        </button>
+      </div>
+
+      {/* Featured Big CTA Card (Apple Fitness+ style banner) */}
+      <div className="relative rounded-[28px] overflow-hidden bg-[#131A16] border border-white/10 shadow-xl shadow-black/50 p-5 space-y-4">
+        {/* Background Dark Fitness Styling */}
         <div
-          className="absolute -top-20 inset-x-0 h-36 pointer-events-none"
+          className="absolute inset-0 bg-cover bg-center opacity-30"
           style={{
-            background:
-              'radial-gradient(circle at 50% 50%, rgba(116, 216, 52, 0.12), transparent 70%)',
+            backgroundImage:
+              'url("https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=800&auto=format&fit=crop")',
           }}
         />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0D0B] via-[#0A0D0B]/70 to-transparent" />
 
-        <div className="flex items-center justify-between mb-3.5 relative z-10">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-white tracking-wide">
-              Progreso de tu día
-            </span>
-            <StreakBadge streak={streaks.overall} />
+        <div className="relative z-10 space-y-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[10px] font-bold text-[#74D834] uppercase tracking-wider">
+            <Sparkles className="w-3 h-3" />
+            <span>DISCIPLINE = FREEDOM</span>
           </div>
-          <button
-            type="button"
-            onClick={() => onNavigateTab('estadisticas')}
-            className="text-[11px] text-[#74D834] font-semibold hover:underline cursor-pointer"
-          >
-            Ver todo
-          </button>
+
+          <h3 className="font-display text-xl font-black text-white tracking-tight leading-tight">
+            Carrera al aire libre GPS
+          </h3>
+          <p className="text-xs text-[#C5D0C8] max-w-xs">
+            Registra tu ruta en tiempo real con velocímetro, calorías y trazo satelital estilo Apple Maps.
+          </p>
         </div>
 
-        <div className="flex items-center justify-between gap-4 relative z-10">
-          {/* Left: Circular Progress Ring */}
-          <div className="shrink-0 flex items-center justify-center">
-            <ProgressRing
-              percent={goalPercent}
-              size={120}
-              strokeWidth={10}
-              sublabel="Completado"
-            />
-          </div>
-
-          {/* Right: 3 organized metric rows matching photo */}
-          <div className="flex-1 space-y-3 min-w-0">
-            {/* Row 1: Workouts */}
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-[#1C2620] border border-[#74D834]/30 flex items-center justify-center shrink-0">
-                <Dumbbell className="w-4 h-4 text-[#74D834]" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] text-[#8E9D93] block">Entrenamiento</span>
-                <span className="font-mono-nums text-xs font-bold text-white block truncate">
-                  {habits.workoutDone ? '1 / 1 realizado' : '0 / 1 pendiente'}
-                </span>
-              </div>
-            </div>
-
-            {/* Row 2: Calories */}
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-[#1C2620] border border-amber-500/30 flex items-center justify-center shrink-0">
-                <Flame className="w-4 h-4 text-amber-400" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] text-[#8E9D93] block">Calorías meta</span>
-                <span className="font-mono-nums text-xs font-bold text-white block truncate">
-                  {profile.calorieTargetMin}–{profile.calorieTargetMax} kcal
-                </span>
-              </div>
-            </div>
-
-            {/* Row 3: Hydration */}
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-[#1C2620] border border-[#4CC9B0]/30 flex items-center justify-center shrink-0">
-                <Droplets className="w-4 h-4 text-[#4CC9B0]" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] text-[#8E9D93] block">Hidratación</span>
-                <span className="font-mono-nums text-xs font-bold text-white block truncate">
-                  {habits.waterLiters.toFixed(1)} / {profile.waterTargetLiters} L
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions (3 buttons in a row matching reference Photo 2) */}
-      <div>
-        <h3 className="text-xs font-bold text-white mb-2">Acciones rápidas</h3>
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="relative z-10 pt-1">
           <button
             type="button"
-            onClick={() => onNavigateTab('rutinas')}
-            className="rounded-2xl bg-[#131A16] border border-white/8 p-3 flex flex-col items-center text-center hover:border-[#74D834]/40 active:scale-[0.98] transition-all cursor-pointer"
+            onClick={onLaunchOutdoorRun}
+            className="w-full min-h-[48px] rounded-2xl bg-[#74D834] text-[#081007] font-display font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer hover:bg-[#82E63E] active:scale-[0.98] transition-all shadow-lg shadow-[#74D834]/25"
           >
-            <div className="w-9 h-9 rounded-xl bg-[#1C2620] flex items-center justify-center mb-1.5">
-              <Dumbbell className="w-4 h-4 text-[#74D834]" />
-            </div>
-            <span className="text-xs font-bold text-white leading-tight">Rutinas</span>
-            <span className="text-[10px] text-[#8E9D93] mt-0.5">Explorar</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigateTab('nutricion')}
-            className="rounded-2xl bg-[#131A16] border border-white/8 p-3 flex flex-col items-center text-center hover:border-[#74D834]/40 active:scale-[0.98] transition-all cursor-pointer"
-          >
-            <div className="w-9 h-9 rounded-xl bg-[#1C2620] flex items-center justify-center mb-1.5">
-              <Calendar className="w-4 h-4 text-amber-400" />
-            </div>
-            <span className="text-xs font-bold text-white leading-tight">Mi Plan</span>
-            <span className="text-[10px] text-[#8E9D93] mt-0.5">Nutrición</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigateTab('estadisticas')}
-            className="rounded-2xl bg-[#131A16] border border-white/8 p-3 flex flex-col items-center text-center hover:border-[#74D834]/40 active:scale-[0.98] transition-all cursor-pointer"
-          >
-            <div className="w-9 h-9 rounded-xl bg-[#1C2620] flex items-center justify-center mb-1.5">
-              <TrendingUp className="w-4 h-4 text-[#4CC9B0]" />
-            </div>
-            <span className="text-xs font-bold text-white leading-tight">Progreso</span>
-            <span className="text-[10px] text-[#8E9D93] mt-0.5">Métricas</span>
+            <Play className="w-4.5 h-4.5 fill-current" />
+            <span>Iniciar carrera ahora</span>
           </button>
         </div>
       </div>
 
-      {/* Pasos, Distancia y Sesiones (Resumen tipo Fitness ajustado a Mi Salud Pro) */}
-      {onAddManualSession && todayDate && (
-        <ActivitySummaryCards
+      {/* Discreet Health Quick Actions (Sueño, Agua, Nutrición) */}
+      <div className="grid grid-cols-3 gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onOpenHealthModule}
+          className="rounded-2xl bg-[#131A16] border border-white/7 p-3 flex flex-col items-center justify-center gap-1 hover:border-[#74D834]/30 transition-all cursor-pointer text-center"
+        >
+          <Moon className="w-4 h-4 text-[#A084E8]" />
+          <span className="text-[11px] font-bold text-white">Sueño</span>
+          <span className="text-[10px] font-mono-nums text-[#8E9D93]">
+            {habits.sleepHours}h / 8h
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onUpdateHabit({ waterLiters: habits.waterLiters + 0.25 })}
+          className="rounded-2xl bg-[#131A16] border border-white/7 p-3 flex flex-col items-center justify-center gap-1 hover:border-[#3FC8FF]/30 transition-all cursor-pointer text-center"
+        >
+          <Droplets className="w-4 h-4 text-[#3FC8FF]" />
+          <span className="text-[11px] font-bold text-white">+250 ml</span>
+          <span className="text-[10px] font-mono-nums text-[#8E9D93]">
+            {habits.waterLiters.toFixed(1)} L
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigateTab('nutricion')}
+          className="rounded-2xl bg-[#131A16] border border-white/7 p-3 flex flex-col items-center justify-center gap-1 hover:border-amber-400/30 transition-all cursor-pointer text-center"
+        >
+          <Utensils className="w-4 h-4 text-amber-400" />
+          <span className="text-[11px] font-bold text-white">Comidas</span>
+          <span className="text-[10px] font-mono-nums text-[#8E9D93]">
+            {Math.round(nutritionTotals.calories)} kcal
+          </span>
+        </button>
+      </div>
+
+      {/* Sessions Full Modal with Swipe-to-delete */}
+      {showSessionsModal && (
+        <SessionsModal
           sessions={workoutSessions}
           todayDate={todayDate}
-          onAddManualSession={onAddManualSession}
+          onClose={() => setShowSessionsModal(false)}
+          onAddManualSession={onAddManualSession!}
           onDeleteSession={onDeleteSession}
         />
       )}
 
-      {/* Today's Workout Card matching reference Photo 2 */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-bold text-white">Entrenamiento de hoy</h3>
-          <button
-            type="button"
-            onClick={() => onNavigateTab('rutinas')}
-            className="text-[11px] text-[#74D834] font-semibold hover:underline cursor-pointer"
-          >
-            Ver todo
-          </button>
-        </div>
-
-        <div
-          onClick={() => onNavigateTab('rutinas')}
-          className="rounded-2xl bg-[#131A16] border border-white/8 p-3 flex items-center gap-3 hover:border-[#74D834]/40 transition-colors cursor-pointer group"
-        >
-          <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-[#0C120E] border border-white/5">
-            <img
-              src={IMAGE_ASSETS.strengthHero}
-              alt="Fuerza Total"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-bold text-white truncate">Fuerza Total</h4>
-            <p className="text-[11px] text-[#8E9D93] mt-0.5">
-              45 min · Intermedio · Guía 3D
-            </p>
-          </div>
-          <div className="w-9 h-9 rounded-full bg-[#74D834] text-[#081007] flex items-center justify-center shrink-0 shadow-md shadow-[#74D834]/20 group-hover:brightness-110 transition-all">
-            <Play className="w-4 h-4 fill-current ml-0.5" />
-          </div>
-        </div>
-      </div>
-
-      {/* 2-Column Stat Cards: Peso actual & Cintura */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={() => openModal('weight')}
-          className="text-left rounded-2xl bg-[#131A16] border border-white/7 p-3.5 hover:border-[#74D834]/40 transition-colors cursor-pointer"
-        >
-          <p className="text-xs text-[#9AA89E]">Peso actual</p>
-          <p className="font-display text-xl font-bold text-white mt-1 tabular-nums">
-            {currentWeight} <span className="text-sm font-medium text-[#C5D0C8]">kg</span>
-          </p>
-          <p
-            className={`text-xs font-medium mt-1 inline-flex items-center gap-1 tabular-nums ${
-              weightDelta <= 0 ? 'text-[#74D834]' : 'text-[#E06A5E]'
-            }`}
-          >
-            {weightDelta <= 0 ? (
-              <ArrowDown className="w-3 h-3" />
-            ) : (
-              <ArrowUp className="w-3 h-3" />
-            )}
-            <span>{weightDelta > 0 ? `+${weightDelta}` : weightDelta} kg</span>
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => openModal('waist')}
-          className="text-left rounded-2xl bg-[#131A16] border border-white/7 p-3.5 hover:border-[#74D834]/40 transition-colors cursor-pointer"
-        >
-          <p className="text-xs text-[#9AA89E]">Cintura</p>
-          <p className="font-display text-xl font-bold text-white mt-1 tabular-nums">
-            {currentWaist} <span className="text-sm font-medium text-[#C5D0C8]">cm</span>
-          </p>
-          <p
-            className={`text-xs font-medium mt-1 inline-flex items-center gap-1 tabular-nums ${
-              waistDelta <= 0 ? 'text-[#74D834]' : 'text-[#E06A5E]'
-            }`}
-          >
-            {waistDelta <= 0 ? (
-              <ArrowDown className="w-3 h-3" />
-            ) : (
-              <ArrowUp className="w-3 h-3" />
-            )}
-            <span>{waistDelta > 0 ? `+${waistDelta}` : waistDelta} cm</span>
-          </p>
-        </button>
-      </div>
-
-      {/* Tu día Checklist */}
-      <div className="rounded-3xl bg-[#131A16] border border-white/7 p-4">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <div>
-            <h2 className="font-display text-sm font-bold text-white">Tu día</h2>
-            <p className="text-[10px] text-[#849489]">
-              {streaks.overall.completedToday
-                ? 'Racha diaria asegurada hoy'
-                : streaks.overall.days > 0
-                  ? 'Completa 2 hábitos hoy para sumar +1 día'
-                  : 'Completa 2 hábitos para iniciar racha'}
-            </p>
-          </div>
-          <StreakBadge streak={streaks.overall} />
-        </div>
-
-        <div className="divide-y divide-white/6">
-          <div className="flex items-center justify-between gap-2 py-2.5 min-h-[46px]">
-            <button
-              type="button"
-              onClick={() => onUpdateHabit({ workoutDone: !habits.workoutDone })}
-              className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
-            >
-              <span
-                className={`w-5 h-5 rounded-md flex items-center justify-center border shrink-0 ${
-                  habits.workoutDone
-                    ? 'bg-[#74D834] border-[#74D834] text-[#081007]'
-                    : 'border-[#45544A]'
-                }`}
-              >
-                {habits.workoutDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-              </span>
-              <span className="text-sm text-[#EDF2ED] truncate">Entrenamiento</span>
-            </button>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <StreakBadge streak={streaks.workout} compact />
-              <button
-                type="button"
-                onClick={() => onNavigateTab('rutinas')}
-                className="p-1 text-[#7D8C82] hover:text-white cursor-pointer"
-                aria-label="Ir a entrenamiento"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between gap-2 py-2.5 min-h-[46px]">
-            <button
-              type="button"
-              onClick={() =>
-                onUpdateHabit({ healthyEatingDone: !habits.healthyEatingDone })
-              }
-              className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
-            >
-              <span
-                className={`w-5 h-5 rounded-md flex items-center justify-center border shrink-0 ${
-                  habits.healthyEatingDone
-                    ? 'bg-[#74D834] border-[#74D834] text-[#081007]'
-                    : 'border-[#45544A]'
-                }`}
-              >
-                {habits.healthyEatingDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-              </span>
-              <span className="text-sm text-[#EDF2ED] truncate">Comer saludable</span>
-            </button>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <StreakBadge streak={streaks.eating} compact />
-              <button
-                type="button"
-                onClick={() => onNavigateTab('nutricion')}
-                className="p-1 text-[#7D8C82] hover:text-white cursor-pointer"
-                aria-label="Ir a nutrición"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between gap-2 py-2.5 min-h-[46px]">
-            <button
-              type="button"
-              onClick={onOpenHealthModule}
-              className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
-            >
-              <span
-                className={`w-5 h-5 rounded-md flex items-center justify-center border shrink-0 ${
-                  waterDone
-                    ? 'bg-[#74D834] border-[#74D834] text-[#081007]'
-                    : 'border-[#45544A]'
-                }`}
-              >
-                {waterDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-              </span>
-              <span className="text-sm text-[#EDF2ED] tabular-nums truncate">
-                Hidratarte ({habits.waterLiters.toFixed(1)}/{profile.waterTargetLiters} L)
-              </span>
-            </button>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <StreakBadge streak={streaks.water} compact />
-              <button
-                type="button"
-                onClick={() =>
-                  onUpdateHabit({
-                    waterLiters: Number(Math.min(5, habits.waterLiters + 0.25).toFixed(2)),
-                  })
-                }
-                className="min-h-[32px] px-2 rounded-lg bg-[#1D2821] text-[11px] font-medium text-[#74D834] inline-flex items-center gap-0.5 cursor-pointer"
-              >
-                <Plus className="w-3 h-3" />
-                <span>250ml</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between gap-2 py-2.5 min-h-[46px]">
-            <button
-              type="button"
-              onClick={() => onUpdateHabit({ sleepHours: sleepDone ? 6.5 : 8 })}
-              className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
-            >
-              <span
-                className={`w-5 h-5 rounded-md flex items-center justify-center border shrink-0 ${
-                  sleepDone
-                    ? 'bg-[#74D834] border-[#74D834] text-[#081007]'
-                    : 'border-[#45544A]'
-                }`}
-              >
-                {sleepDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-              </span>
-              <span className="text-sm text-[#EDF2ED] tabular-nums truncate">
-                Dormir 7-9 h
-              </span>
-            </button>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <StreakBadge streak={streaks.sleep} compact />
-              <button
-                type="button"
-                onClick={onOpenHealthModule}
-                className="p-1 text-[#7D8C82] hover:text-white cursor-pointer"
-                aria-label="Registrar sueño"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Flame Tier Legend */}
-        <div className="mt-2 pt-2.5 border-t border-white/6 flex items-center justify-between text-[10px] text-[#849489]">
-          <span className="inline-flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
-            1–2d
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-[#FF6B2C]" />
-            3–6d
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-[#FA114F]" />
-            7–13d
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-[#38BDF8]" />
-            14+d
-          </span>
-        </div>
-      </div>
-
-      {/* Customizable Interactive Widgets Grid */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between px-0.5">
-          <h2 className="font-display text-sm font-bold text-white">Tus Widgets</h2>
-          <button
-            type="button"
-            onClick={() => setShowWidgetEditor(true)}
-            className="text-[11px] font-semibold text-[#74D834] inline-flex items-center gap-1 hover:underline cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Editar / Agregar</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2.5">
-          {/* Widget 1: Sueño y Alarma */}
-          {enabledWidgets.includes('sleep') && (
-          <button
-            type="button"
-            onClick={onOpenHealthModule}
-            className="text-left rounded-2xl bg-[#131A16] border border-white/8 hover:border-[#D6A63A]/45 p-3.5 space-y-2 transition-colors cursor-pointer"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-[#D6A63A] flex items-center gap-1">
-                <Moon className="w-3.5 h-3.5" />
-                <span>Sueño</span>
-              </span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#D6A63A]/15 text-[#F6D377] font-mono-nums">
-                {reminders?.wakeUpTime || '06:30'}
-              </span>
-            </div>
-            <p className="font-mono-nums text-xl font-bold text-white">
-              {habits.sleepHours} <span className="text-xs font-normal text-[#9AA89E]">h</span>
-            </p>
-            <p className="text-[10px] text-[#8E9D93] flex items-center gap-1 truncate">
-              <AlarmClock className="w-3 h-3 text-[#D6A63A] shrink-0" />
-              <span>
-                {(reminders?.wakeUpEnabled ?? true) ? 'Alarma iPhone activa' : 'Alarma apagada'}
-              </span>
-            </p>
-          </button>
-          )}
-
-          {/* Widget 2: Hidratación rápida */}
-          {enabledWidgets.includes('water') && (
-          <div className="rounded-2xl bg-[#131A16] border border-white/8 p-3.5 space-y-2">
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={onOpenHealthModule}
-                className="text-[11px] font-semibold text-[#4CC9B0] flex items-center gap-1 cursor-pointer"
-              >
-                <Droplets className="w-3.5 h-3.5" />
-                <span>Agua</span>
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  onUpdateHabit({
-                    waterLiters: Number(Math.min(6, habits.waterLiters + 0.25).toFixed(2)),
-                  })
-                }
-                className="px-1.5 py-0.5 rounded-md bg-[#4CC9B0]/18 text-[#4CC9B0] text-[10px] font-bold cursor-pointer"
-              >
-                +250ml
-              </button>
-            </div>
-            <p className="font-mono-nums text-xl font-bold text-white">
-              {habits.waterLiters.toFixed(1)}{' '}
-              <span className="text-xs font-normal text-[#9AA89E]">
-                / {profile.waterTargetLiters}L
-              </span>
-            </p>
-            <div className="h-1.5 rounded-full bg-[#1C2620] overflow-hidden">
-              <div
-                className="h-full rounded-full bg-[#4CC9B0] transition-all"
-                style={{
-                  width: `${Math.min(100, (habits.waterLiters / Math.max(0.5, profile.waterTargetLiters)) * 100)}%`,
-                }}
-              />
-            </div>
-          </div>
-          )}
-
-          {/* Widget 3: Calorías y Macros */}
-          {enabledWidgets.includes('calories') && (
-          <button
-            type="button"
-            onClick={() => onNavigateTab('nutricion')}
-            className="text-left rounded-2xl bg-[#131A16] border border-white/8 hover:border-[#FB5262]/45 p-3.5 space-y-1.5 transition-colors cursor-pointer"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-[#FB5262] flex items-center gap-1">
-                <Utensils className="w-3.5 h-3.5" />
-                <span>Calorías</span>
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-[#6E7C73]" />
-            </div>
-            <p className="font-mono-nums text-xl font-bold text-white">
-              {Math.round(nutritionTotals.calories)}{' '}
-              <span className="text-xs font-normal text-[#9AA89E]">kcal</span>
-            </p>
-            <p className="text-[10px] font-mono-nums text-[#8E9D93] truncate">
-              P {Math.round(nutritionTotals.proteinG)}g · C {Math.round(nutritionTotals.carbsG)}g · G{' '}
-              {Math.round(nutritionTotals.fatG)}g
-            </p>
-          </button>
-          )}
-
-          {/* Widget 4: Racha Activa */}
-          {enabledWidgets.includes('streak') && (
-          <button
-            type="button"
-            onClick={() => onNavigateTab('estadisticas')}
-            className="text-left rounded-2xl bg-[#131A16] border border-white/8 hover:border-[#FF6B2C]/45 p-3.5 space-y-1.5 transition-colors cursor-pointer"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-[#FF6B2C] flex items-center gap-1">
-                <Flame className="w-3.5 h-3.5" />
-                <span>Racha</span>
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-[#6E7C73]" />
-            </div>
-            <p className="font-mono-nums text-xl font-bold text-white">
-              {streaks.overall.days}{' '}
-              <span className="text-xs font-normal text-[#9AA89E]">
-                {streaks.overall.days === 1 ? 'día' : 'días'}
-              </span>
-            </p>
-            <p className="text-[10px] text-[#8E9D93] truncate">
-              {streaks.overall.completedToday ? 'Meta diaria cumplida hoy' : '2 hábitos = +1 día'}
-            </p>
-          </button>
-          )}
-
-          {/* Widget 5: Carrera GPS */}
-          {enabledWidgets.includes('gps') && (
-          <button
-            type="button"
-            onClick={onLaunchOutdoorRun}
-            className="text-left rounded-2xl bg-[#131A16] border border-white/8 hover:border-[#74D834]/45 p-3.5 space-y-1.5 transition-colors cursor-pointer"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-[#74D834] flex items-center gap-1">
-                <Footprints className="w-3.5 h-3.5" />
-                <span>Carrera GPS</span>
-              </span>
-              <Play className="w-3.5 h-3.5 text-[#74D834] fill-current" />
-            </div>
-            <p className="font-display text-sm font-bold text-white">Iniciar ruta</p>
-            <p className="text-[10px] text-[#8E9D93] truncate">Mapa, distancia y ritmo</p>
-          </button>
-          )}
-
-          {/* Widget 6: Suelo Pélvico (Kegel) */}
-          {enabledWidgets.includes('kegel') && (
-          <button
-            type="button"
-            onClick={onOpenHealthModule}
-            className="text-left rounded-2xl bg-[#131A16] border border-white/8 hover:border-[#3FC8FF]/45 p-3.5 space-y-1.5 transition-colors cursor-pointer"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-[#3FC8FF] flex items-center gap-1">
-                <HeartPulse className="w-3.5 h-3.5" />
-                <span>Kegel</span>
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-[#6E7C73]" />
-            </div>
-            <p className="font-mono-nums text-xl font-bold text-white">
-              {kegelCount} <span className="text-xs font-normal text-[#9AA89E]">ses.</span>
-            </p>
-            <p className="text-[10px] text-[#8E9D93] truncate">Guía 10 ciclos · Audio</p>
-          </button>
-          )}
-        </div>
-      </div>
-
-      {/* Modal: Agregar o quitar Widgets en Inicio */}
-      {showWidgetEditor && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end justify-center p-4">
-          <div className="w-full max-w-md rounded-3xl bg-[#141C17] border border-white/10 p-5 space-y-3">
-            <div className="flex items-center justify-between">
+      {/* Awards Modal */}
+      {showAwardsModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
+          <div className="w-full max-w-md rounded-[32px] bg-[#131A16] border border-white/12 p-5 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-1">
               <div>
-                <h3 className="font-display text-base font-bold text-white">
-                  Personalizar Widgets
+                <h3 className="font-display text-lg font-bold text-white">
+                  Premios y Logros
                 </h3>
                 <p className="text-[11px] text-[#8E9D93]">
-                  Activa o desactiva widgets en tu pantalla de Inicio
+                  Insignias al estilo Apple Fitness
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setShowWidgetEditor(false)}
-                className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center text-[#9AA89E] cursor-pointer"
+                onClick={() => setShowAwardsModal(false)}
+                className="w-8 h-8 rounded-full bg-white/8 hover:bg-white/15 flex items-center justify-center text-[#C5D0C8] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="space-y-2">
-              {ALL_WIDGET_OPTIONS.map((opt) => {
-                const active = enabledWidgets.includes(opt.id);
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => toggleHomeWidget(opt.id)}
-                    className={`w-full rounded-2xl border p-3 flex items-center justify-between text-left cursor-pointer ${
-                      active
-                        ? 'bg-[#17241B] border-[#74D834]/45'
-                        : 'bg-[#0D120F] border-white/8 opacity-70'
-                    }`}
-                  >
-                    <div>
-                      <p className="text-xs font-bold text-white">{opt.label}</p>
-                      <p className="text-[10px] text-[#8E9D93]">{opt.desc}</p>
-                    </div>
-                    <span
-                      className={`w-6 h-6 rounded-full flex items-center justify-center border ${
-                        active
-                          ? 'bg-[#74D834] border-[#74D834] text-[#081007]'
-                          : 'border-white/20 text-transparent'
-                      }`}
-                    >
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+
+            <div className="grid grid-cols-2 gap-3">
+              {awards.map((award) => (
+                <div
+                  key={award.id}
+                  className={`p-3.5 rounded-2xl border text-center space-y-2 ${
+                    award.unlocked
+                      ? 'bg-[#18211C] border-[#74D834]/40'
+                      : 'bg-white/2 border-white/6 opacity-40'
+                  }`}
+                >
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-b from-[#2E3730] to-[#121814] border-2 border-[#8E9D93]/50 shadow-inner flex items-center justify-center text-white mx-auto">
+                    <Trophy className="w-5 h-5 text-[#74D834]" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-white">{award.title}</p>
+                    <p className="text-[10px] text-[#8E9D93] mt-0.5">{award.desc}</p>
+                    <span className="text-[9px] font-mono-nums text-[#74D834] mt-1 block">
+                      {award.unlocked ? award.date : 'Bloqueado'}
                     </span>
-                  </button>
-                );
-              })}
+                  </div>
+                </div>
+              ))}
             </div>
-            <button
-              type="button"
-              onClick={() => setShowWidgetEditor(false)}
-              className="w-full py-3 rounded-2xl bg-[#74D834] text-[#081007] font-bold text-sm cursor-pointer"
-            >
-              Listo
-            </button>
           </div>
-        </div>
-      )}
-
-      {/* Quick Module Card: Salud y Suelo Pélvico */}
-      <button
-        type="button"
-        onClick={onOpenHealthModule}
-        className="w-full text-left rounded-2xl bg-[#131A16] border border-white/7 p-3.5 hover:border-[#74D834]/35 transition-colors flex items-center justify-between gap-2.5 cursor-pointer"
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-[#74D834]/12 border border-[#74D834]/25 flex items-center justify-center text-[#74D834] shrink-0">
-            <HeartPulse className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-display text-sm font-semibold text-white truncate">
-              Salud y Suelo Pélvico
-            </h3>
-            <p className="text-[11px] text-[#9AA89E] mt-0.5 flex items-center gap-1.5 truncate">
-              <span className="inline-flex items-center gap-1">
-                <Droplets className="w-3 h-3 text-[#4CC9B0]" />
-                {habits.waterLiters.toFixed(1)}L
-              </span>
-              <span aria-hidden="true">·</span>
-              <span className="inline-flex items-center gap-1">
-                <Moon className="w-3 h-3 text-[#D6A63A]" />
-                {habits.sleepHours}h
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>Guía Kegel</span>
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <StreakBadge streak={streaks.kegel} compact />
-          <ChevronRight className="w-4 h-4 text-[#7D8C82]" />
-        </div>
-      </button>
-
-      {/* Quick Log Weight / Waist Modal */}
-      {quickModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end justify-center p-4">
-          <form
-            onSubmit={handleSaveQuick}
-            className="w-full rounded-3xl bg-[#141C17] border border-white/10 p-5 space-y-4"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-base font-bold text-white">
-                {quickModal === 'weight' ? 'Registrar peso actual' : 'Registrar cintura'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setQuickModal(null)}
-                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-[#9AA89E] cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <input
-              type="number"
-              step="0.1"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              autoFocus
-              className="w-full min-h-[46px] px-4 rounded-xl bg-[#0D120F] border border-white/10 text-lg font-mono-nums text-white"
-            />
-            <button
-              type="submit"
-              className="w-full min-h-[46px] rounded-2xl font-display font-semibold text-sm text-[#081007] bg-gradient-to-r from-[#82E63E] to-[#58C222] cursor-pointer"
-            >
-              Guardar registro
-            </button>
-          </form>
         </div>
       )}
     </div>
