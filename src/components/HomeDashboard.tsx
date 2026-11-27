@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Award,
+  Calendar as CalendarIcon,
   ChevronRight,
   Droplets,
   Dumbbell,
@@ -9,6 +10,7 @@ import {
   Moon,
   Play,
   Plus,
+  RotateCcw,
   Route,
   Sparkles,
   Trophy,
@@ -61,6 +63,8 @@ const WEEKDAYS_ES = [
   'sábado',
 ];
 
+const SHORT_DAYS_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
 function formatDayOfWeek(iso: string, todayIso: string): string {
   if (iso === todayIso) return 'hoy';
   const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
@@ -76,6 +80,15 @@ function formatDateShort(iso: string): string {
   return iso;
 }
 
+function formatHeaderDate(iso: string, todayIso: string): string {
+  if (iso === todayIso) return 'Hoy';
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  const dayName = WEEKDAYS_ES[d.getDay()];
+  const capitalized = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+  return `${capitalized}, ${d.getDate()} de ${d.toLocaleString('es-ES', { month: 'short' })}`;
+}
+
 export function HomeDashboard({
   profile,
   habits,
@@ -89,22 +102,59 @@ export function HomeDashboard({
   onAddManualSession,
   onDeleteSession,
 }: HomeDashboardProps) {
+  const [selectedDate, setSelectedDate] = useState<string>(todayDate);
   const [showSessionsModal, setShowSessionsModal] = useState(false);
   const [showAwardsModal, setShowAwardsModal] = useState(false);
+  const datePickerRef = useRef<HTMLInputElement | null>(null);
 
-  // Compute stats for today
+  // Generate 7-day strip centered or showing current week (Mon-Sun)
+  const weekStrip = useMemo(() => {
+    const base = new Date(`${todayDate.slice(0, 10)}T12:00:00`);
+    const dayOfWeek = (base.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+    const monday = new Date(base);
+    monday.setDate(base.getDate() - dayOfWeek);
+
+    const days: Array<{
+      iso: string;
+      dayNumber: number;
+      shortLabel: string;
+      isToday: boolean;
+      hasActivity: boolean;
+    }> = [];
+
+    for (let i = 0; i < 7; i++) {
+      const cur = new Date(monday);
+      cur.setDate(monday.getDate() + i);
+      const iso = cur.toISOString().slice(0, 10);
+      const hasAct = workoutSessions.some(
+        (s) => (s.completedAt || '').slice(0, 10) === iso
+      );
+
+      days.push({
+        iso,
+        dayNumber: cur.getDate(),
+        shortLabel: SHORT_DAYS_ES[i],
+        isToday: iso === todayDate,
+        hasActivity: hasAct,
+      });
+    }
+
+    return days;
+  }, [todayDate, workoutSessions]);
+
+  // Compute stats for the currently selected date
   const {
-    todaySessions,
-    todayCalories,
+    dateSessions,
+    dateCalories,
     calorieGoal,
-    todaySteps,
-    todayMiles,
-    latestSession,
+    dateSteps,
+    dateMiles,
+    latestSessionForDate,
     stepBars,
     distanceBars,
   } = useMemo(() => {
     const list = workoutSessions.filter(
-      (s) => (s.completedAt || '').slice(0, 10) === todayDate
+      (s) => (s.completedAt || '').slice(0, 10) === selectedDate
     );
     const steps = estimateStepsFromSessions(list);
     const miles = list.reduce((acc, s) => acc + (Number(s.distanceMiles) || 0), 0);
@@ -113,7 +163,7 @@ export function HomeDashboard({
       0
     );
 
-    const sorted = [...workoutSessions].sort((a, b) =>
+    const sorted = [...list].sort((a, b) =>
       (b.completedAt || '').localeCompare(a.completedAt || '')
     );
     const latest = sorted[0] || null;
@@ -141,16 +191,16 @@ export function HomeDashboard({
     const targetCal = profile.calorieTargetMax ? Math.round(profile.calorieTargetMax * 0.25) : 420;
 
     return {
-      todaySessions: list,
-      todayCalories: cals > 0 ? cals : (habits.workoutDone ? 462 : 0),
+      dateSessions: list,
+      dateCalories: cals > 0 ? cals : (selectedDate === todayDate && habits.workoutDone ? 462 : 0),
       calorieGoal: Math.max(300, targetCal),
-      todaySteps: steps > 0 ? steps : (habits.workoutDone ? 10007 : 0),
-      todayMiles: miles > 0 ? miles : (habits.workoutDone ? 4.52 : 0),
-      latestSession: latest,
+      dateSteps: steps > 0 ? steps : (selectedDate === todayDate && habits.workoutDone ? 10007 : 0),
+      dateMiles: miles > 0 ? miles : (selectedDate === todayDate && habits.workoutDone ? 4.52 : 0),
+      latestSessionForDate: latest,
       stepBars: sBars,
       distanceBars: dBars,
     };
-  }, [workoutSessions, todayDate, profile, habits.workoutDone]);
+  }, [workoutSessions, selectedDate, todayDate, profile, habits.workoutDone]);
 
   // Unlocked Awards
   const awards = useMemo(() => {
@@ -164,14 +214,18 @@ export function HomeDashboard({
       {
         id: 'first-run',
         title: 'Primera carrera',
-        date: latestSession?.completedAt ? formatDateShort(latestSession.completedAt) : '11/24/26',
+        date: latestSessionForDate?.completedAt
+          ? formatDateShort(latestSessionForDate.completedAt)
+          : '11/24/26',
         desc: 'Registra una ruta con GPS activo',
         unlocked: hasOutdoor || totalCount > 0,
       },
       {
         id: 'first-workout',
         title: 'Primer entreno',
-        date: latestSession?.completedAt ? formatDateShort(latestSession.completedAt) : '11/20/26',
+        date: latestSessionForDate?.completedAt
+          ? formatDateShort(latestSessionForDate.completedAt)
+          : '11/20/26',
         desc: 'Completa tu primer entrenamiento',
         unlocked: totalCount >= 1,
       },
@@ -190,35 +244,137 @@ export function HomeDashboard({
         unlocked: habits.workoutDone,
       },
     ];
-  }, [workoutSessions, latestSession, habits.workoutDone]);
+  }, [workoutSessions, latestSessionForDate, habits.workoutDone]);
 
   const featuredAward = awards.find((a) => a.unlocked) || awards[0];
 
   // Ring Circumference calculation
   const ringRadius = 42;
   const ringCircumference = 2 * Math.PI * ringRadius;
-  const ringPercent = Math.min(100, Math.round((todayCalories / calorieGoal) * 100));
+  const ringPercent = Math.min(100, Math.round((dateCalories / calorieGoal) * 100));
   const ringOffset = ringCircumference - (ringPercent / 100) * ringCircumference;
+
+  const isBrowsingHistory = selectedDate !== todayDate;
 
   return (
     <div className="space-y-4 pb-8">
-      {/* Top Apple Fitness Style Header */}
+      {/* Top Header with Date Title, Calendar Icon and Avatar */}
       <div className="flex items-center justify-between pt-1">
-        <h1 className="font-display text-3xl font-extrabold tracking-tight text-white">
-          Resumen
-        </h1>
-        <button
-          type="button"
-          onClick={() => onNavigateTab('perfil')}
-          className="rounded-full ring-2 ring-white/10 hover:ring-[#74D834]/50 transition-all cursor-pointer"
-          aria-label="Perfil de usuario"
-        >
-          <UserAvatarImage
-            name={profile.name}
-            sizeClass="w-9 h-9"
-            customUrl={profile.avatarUrl}
-          />
-        </button>
+        <div>
+          <h1 className="font-display text-3xl font-extrabold tracking-tight text-white leading-tight">
+            {formatHeaderDate(selectedDate, todayDate)}
+          </h1>
+          <p className="text-[11px] text-[#8E9D93] font-medium">
+            Resumen de actividad diaria
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Calendar picker button (matches screenshot [📅]) */}
+          <button
+            type="button"
+            onClick={() => datePickerRef.current?.showPicker?.() || datePickerRef.current?.click()}
+            aria-label="Abrir calendario"
+            className="w-9 h-9 rounded-full bg-[#18211C] border border-white/10 flex items-center justify-center text-[#C5D0C8] hover:text-white hover:border-[#74D834]/40 transition-colors cursor-pointer relative"
+          >
+            <CalendarIcon className="w-4 h-4 text-[#74D834]" />
+            <input
+              ref={datePickerRef}
+              type="date"
+              value={selectedDate}
+              onChange={(e) => {
+                if (e.target.value) setSelectedDate(e.target.value);
+              }}
+              className="absolute inset-0 opacity-0 pointer-events-none"
+            />
+          </button>
+
+          {/* User profile avatar */}
+          <button
+            type="button"
+            onClick={() => onNavigateTab('perfil')}
+            className="rounded-full ring-2 ring-white/10 hover:ring-[#74D834]/50 transition-all cursor-pointer"
+            aria-label="Perfil de usuario"
+          >
+            <UserAvatarImage
+              name={profile.name}
+              sizeClass="w-9 h-9"
+              customUrl={profile.avatarUrl}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Horizontal Day Strip Calendar (matches user reference image!) */}
+      <div className="rounded-[28px] bg-[#131A16] border border-white/8 p-3 shadow-lg shadow-black/30">
+        <div className="grid grid-cols-7 gap-1 text-center">
+          {weekStrip.map((day) => {
+            const isSelected = day.iso === selectedDate;
+
+            return (
+              <button
+                key={day.iso}
+                type="button"
+                onClick={() => setSelectedDate(day.iso)}
+                className={`py-2 px-1 rounded-2xl flex flex-col items-center justify-center transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-transparent'
+                    : 'hover:bg-white/4'
+                }`}
+              >
+                {/* Short weekday name (Mon, Tue, Wed...) */}
+                <span
+                  className={`text-[11px] font-semibold mb-1 ${
+                    isSelected ? 'text-white' : 'text-[#6E7C73]'
+                  }`}
+                >
+                  {day.shortLabel}
+                </span>
+
+                {/* Day number (20, 21, 22, [23]...) */}
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-extrabold font-mono-nums transition-all ${
+                    isSelected
+                      ? 'bg-[#E2F952] text-[#0A0D0B] shadow-md shadow-[#E2F952]/30 scale-105'
+                      : day.isToday
+                        ? 'border border-[#74D834] text-[#74D834]'
+                        : 'text-[#D2DDD5]'
+                  }`}
+                >
+                  {day.dayNumber}
+                </div>
+
+                {/* Small activity dot if workouts or habits were done */}
+                <div className="h-1.5 flex items-center justify-center mt-1">
+                  {day.hasActivity && (
+                    <span
+                      className={`w-1 h-1 rounded-full ${
+                        isSelected ? 'bg-[#E2F952]' : 'bg-[#74D834]'
+                      }`}
+                    />
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Floating chip if viewing a past date */}
+        {isBrowsingHistory && (
+          <div className="mt-2 pt-2 border-t border-white/6 flex items-center justify-between px-2 text-xs">
+            <span className="text-[#8E9D93]">
+              Resultados del <strong className="text-white">{formatHeaderDate(selectedDate, todayDate)}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedDate(todayDate)}
+              className="text-[11px] font-bold text-[#74D834] hover:underline inline-flex items-center gap-1 cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Volver a hoy</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Círculo de Actividad (Apple Activity Card) */}
@@ -273,11 +429,13 @@ export function HomeDashboard({
               Moverse
             </span>
             <div className="font-mono-nums text-2xl font-black text-[#FA114F] tracking-tight leading-tight">
-              {todayCalories}/{calorieGoal}{' '}
+              {dateCalories}/{calorieGoal}{' '}
               <span className="text-sm font-extrabold">CAL</span>
             </div>
             <p className="text-[11px] text-[#8E9D93] pt-0.5">
-              {ringPercent >= 100 ? '¡Meta diaria superada!' : `${calorieGoal - todayCalories} cal para cerrar`}
+              {ringPercent >= 100
+                ? '¡Meta diaria superada!'
+                : `${Math.max(0, calorieGoal - dateCalories)} cal para cerrar`}
             </p>
           </div>
         </div>
@@ -298,9 +456,11 @@ export function HomeDashboard({
               </span>
               <ChevronRight className="w-4 h-4 text-[#6E7C73] group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <span className="text-[11px] text-[#8E9D93] block">Hoy</span>
+            <span className="text-[11px] text-[#8E9D93] block">
+              {isBrowsingHistory ? formatDayOfWeek(selectedDate, todayDate) : 'Hoy'}
+            </span>
             <span className="font-mono-nums text-2xl font-black text-[#A084E8] tracking-tight mt-0.5 block">
-              {todaySteps.toLocaleString('es-ES')}
+              {dateSteps.toLocaleString('es-ES')}
             </span>
           </div>
 
@@ -336,9 +496,11 @@ export function HomeDashboard({
               </span>
               <ChevronRight className="w-4 h-4 text-[#6E7C73] group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <span className="text-[11px] text-[#8E9D93] block">Hoy</span>
+            <span className="text-[11px] text-[#8E9D93] block">
+              {isBrowsingHistory ? formatDayOfWeek(selectedDate, todayDate) : 'Hoy'}
+            </span>
             <span className="font-mono-nums text-2xl font-black text-[#3FC8FF] tracking-tight mt-0.5 block">
-              {todayMiles.toFixed(2)}{' '}
+              {dateMiles.toFixed(2)}{' '}
               <span className="text-sm font-bold">MI</span>
             </span>
           </div>
@@ -377,7 +539,7 @@ export function HomeDashboard({
             </div>
 
             <div className="w-9 h-9 rounded-full bg-[#74D834]/15 border border-[#74D834]/30 flex items-center justify-center text-[#74D834] mb-2 shrink-0">
-              {latestSession?.isOutdoor ? (
+              {latestSessionForDate?.isOutdoor ? (
                 <Footprints className="w-4.5 h-4.5" />
               ) : (
                 <Dumbbell className="w-4.5 h-4.5" />
@@ -385,24 +547,26 @@ export function HomeDashboard({
             </div>
 
             <p className="text-xs font-semibold text-white truncate">
-              {latestSession?.activityType || latestSession?.routineTitle || 'Carrera al aire libre'}
+              {latestSessionForDate?.activityType ||
+                latestSessionForDate?.routineTitle ||
+                (isBrowsingHistory ? 'Sin entrenamientos' : 'Carrera al aire libre')}
             </p>
             <p className="font-mono-nums text-lg font-black text-[#74D834] tracking-tight">
-              {latestSession?.distanceMiles
-                ? `${latestSession.distanceMiles.toFixed(2)} MI`
-                : latestSession?.caloriesBurned
-                  ? `${latestSession.caloriesBurned} CAL`
-                  : '1.28 MI'}
+              {latestSessionForDate?.distanceMiles
+                ? `${latestSessionForDate.distanceMiles.toFixed(2)} MI`
+                : latestSessionForDate?.caloriesBurned
+                  ? `${latestSessionForDate.caloriesBurned} CAL`
+                  : dateSessions.length > 0
+                    ? `${dateSessions.length} sesión(es)`
+                    : '1.28 MI'}
             </p>
           </div>
 
           <div className="flex items-center justify-between text-[11px] text-[#8E9D93] pt-1">
-            <span>
-              {latestSession?.completedAt
-                ? formatDayOfWeek(latestSession.completedAt, todayDate)
-                : 'martes'}
+            <span>{formatDayOfWeek(selectedDate, todayDate)}</span>
+            <span className="text-[10px] text-[#74D834] font-semibold">
+              {dateSessions.length > 0 ? `${dateSessions.length} ⬢` : '1 ⬢'}
             </span>
-            <span className="text-[10px] text-[#74D834] font-semibold">1 ⬢</span>
           </div>
         </button>
 
@@ -439,7 +603,6 @@ export function HomeDashboard({
 
       {/* Featured Big CTA Card (Apple Fitness+ style banner) */}
       <div className="relative rounded-[28px] overflow-hidden bg-[#131A16] border border-white/10 shadow-xl shadow-black/50 p-5 space-y-4">
-        {/* Background Dark Fitness Styling */}
         <div
           className="absolute inset-0 bg-cover bg-center opacity-30"
           style={{
