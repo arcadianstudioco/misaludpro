@@ -2,6 +2,10 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
+if (typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)) {
+  document.documentElement.classList.add('platform-android');
+}
+
 (window as unknown as {gm_authFailure?: () => void}).gm_authFailure = () => {
   window.dispatchEvent(new CustomEvent('gmp-quota-exceeded'));
 };

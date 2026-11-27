@@ -226,7 +226,7 @@ export function OutdoorRunTracker({
       {/* Top Bar – padded for status bar */}
       <div
         className="px-4 pb-2 flex items-center justify-between gap-2 bg-black border-b border-white/8 shrink-0"
-        style={{ paddingTop: 'max(12px, env(safe-area-inset-top, 12px))' }}
+        style={{ paddingTop: 'max(12px, var(--safe-top))' }}
       >
         <button
           type="button"

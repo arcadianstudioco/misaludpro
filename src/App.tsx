@@ -28,6 +28,11 @@ import { ProfileView } from './components/ProfileView';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator';
 import { exportHealthPlanPdf, GeneratedPdfResult } from './utils/pdfPlanExport';
 import { PdfExportModal } from './components/PdfExportModal';
+import {
+  AchievementDetailModal,
+  AchievementsView,
+} from './components/AchievementsView';
+import { Achievement, computeAchievements } from './utils/achievements';
 import { syncNativeAlarms, syncNativeWidgets } from './utils/nativeAlarms';
 import { estimateStepsFromSessions } from './components/SessionsModal';
 import { useTheme } from './hooks/useTheme';
@@ -92,6 +97,9 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<TabId>('inicio');
   const [showHealthSubView, setShowHealthSubView] = useState(false);
+  const [showAchievementsView, setShowAchievementsView] = useState(false);
+  const [celebratingAchievement, setCelebratingAchievement] =
+    useState<Achievement | null>(null);
   const [autoLaunchOutdoor, setAutoLaunchOutdoor] =
     useState<OutdoorActivityType | null>(null);
   const [activeReminderToast, setActiveReminderToast] = useState<string | null>(null);
@@ -102,7 +110,11 @@ export default function App() {
   // Handle Flutter back-button / iOS swipe-back — close open sub-views
   useEffect(() => {
     const onFlutterBack = () => {
-      if (pdfModalResult) {
+      if (celebratingAchievement) {
+        setCelebratingAchievement(null);
+      } else if (showAchievementsView) {
+        setShowAchievementsView(false);
+      } else if (pdfModalResult) {
         setPdfModalResult(null);
       } else if (showHealthSubView) {
         setShowHealthSubView(false);
@@ -112,7 +124,43 @@ export default function App() {
     };
     window.addEventListener('flutter-back', onFlutterBack);
     return () => window.removeEventListener('flutter-back', onFlutterBack);
-  }, [pdfModalResult, showHealthSubView, activeReminderToast]);
+  }, [
+    celebratingAchievement,
+    showAchievementsView,
+    pdfModalResult,
+    showHealthSubView,
+    activeReminderToast,
+  ]);
+
+  // Detectar logros recién cumplidos para abrir automáticamente la ventana de premio
+  useEffect(() => {
+    if (!state) return;
+    const all = computeAchievements({
+      currentStreak: habitStreaks.currentStreak,
+      sessions: state.workoutSessions,
+      habitsByDate: state.habitsByDate,
+      measurements: state.measurements,
+      meals: state.meals,
+    });
+    const unlockedIds = all.filter((a) => Boolean(a.unlockedAt)).map((a) => a.id);
+    const storageKey = 'misaludpro_celebrated_achievements_v1';
+    const raw = localStorage.getItem(storageKey);
+    if (raw === null) {
+      localStorage.setItem(storageKey, JSON.stringify(unlockedIds));
+      return;
+    }
+    try {
+      const seen = new Set<string>(JSON.parse(raw) as string[]);
+      const newlyUnlocked = all.find((a) => a.unlockedAt && !seen.has(a.id));
+      if (newlyUnlocked) {
+        seen.add(newlyUnlocked.id);
+        localStorage.setItem(storageKey, JSON.stringify([...seen]));
+        setCelebratingAchievement(newlyUnlocked);
+      }
+    } catch {
+      localStorage.setItem(storageKey, JSON.stringify(unlockedIds));
+    }
+  }, [state, habitStreaks.currentStreak]);
 
   // Global left-edge swipe-right gesture (iOS-style back swipe everywhere)
   useEffect(() => {
@@ -409,6 +457,7 @@ export default function App() {
             }
             onNavigateTab={handleSelectTab}
             onOpenHealthModule={() => setShowHealthSubView(true)}
+            onOpenAchievements={() => setShowAchievementsView(true)}
             onLaunchOutdoorRun={() => {
               setShowHealthSubView(false);
               setActiveTab('rutinas');
@@ -521,8 +570,8 @@ export default function App() {
         <main
           className={`flex-1 ${
             isAuthenticated
-              ? 'px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]'
-              : 'p-0 pb-[env(safe-area-inset-bottom,16px)]'
+              ? 'px-4 pt-[calc(var(--safe-top)+0.75rem)] pb-[calc(6.5rem+var(--safe-bottom))]'
+              : 'pt-[var(--safe-top)] pb-[max(1rem,var(--safe-bottom))]'
           }`}
         >
           {renderMobileScreenContent()}
@@ -531,7 +580,7 @@ export default function App() {
         {isAuthenticated && (
           <nav
             aria-label="Barra inferior móvil"
-            className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] pointer-events-none"
+            className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-[max(0.75rem,var(--safe-bottom))] pointer-events-none"
           >
             <div className="liquid-glass-nav rounded-[28px] grid grid-cols-5 items-center h-16 px-1.5 pointer-events-auto">
               {NAV_ITEMS.map((item) => {
@@ -644,6 +693,27 @@ export default function App() {
           result={pdfModalResult}
           userName={state.profile.name}
           onClose={() => setPdfModalResult(null)}
+        />
+      )}
+
+      {/* Ventana de Premios y Logros */}
+      {showAchievementsView && state && (
+        <AchievementsView
+          profile={state.profile}
+          currentStreak={habitStreaks.currentStreak}
+          sessions={state.workoutSessions}
+          habitsByDate={state.habitsByDate}
+          measurements={state.measurements}
+          meals={state.meals}
+          onClose={() => setShowAchievementsView(false)}
+        />
+      )}
+
+      {/* Ventana celebratoria automática al cumplir un logro nuevo */}
+      {celebratingAchievement && (
+        <AchievementDetailModal
+          achievement={celebratingAchievement}
+          onClose={() => setCelebratingAchievement(null)}
         />
       )}
     </div>

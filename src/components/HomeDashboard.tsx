@@ -37,6 +37,7 @@ interface HomeDashboardProps {
   onUpdateHabit: (patch: Partial<DailyHabits>) => void;
   onNavigateTab: (tab: TabId) => void;
   onOpenHealthModule: () => void;
+  onOpenAchievements?: () => void;
   onLaunchOutdoorRun: () => void;
   todayDate?: string;
   workoutSessions?: WorkoutSessionLog[];
@@ -95,6 +96,7 @@ export function HomeDashboard({
   onUpdateHabit,
   onNavigateTab,
   onOpenHealthModule,
+  onOpenAchievements,
   onLaunchOutdoorRun,
   todayDate = new Date().toISOString().slice(0, 10),
   workoutSessions = [],
@@ -576,7 +578,7 @@ export function HomeDashboard({
         {/* CARD 4: PREMIOS */}
         <button
           type="button"
-          onClick={() => setShowAwardsModal(true)}
+          onClick={() => (onOpenAchievements ? onOpenAchievements() : setShowAwardsModal(true))}
           className="rounded-[28px] bg-[#131A16] border border-white/8 hover:border-white/20 p-4 text-left transition-all cursor-pointer flex flex-col justify-between min-h-[160px] shadow-md shadow-black/30 group"
         >
           <div>

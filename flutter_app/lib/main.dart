@@ -48,6 +48,31 @@ class _MiSaludProWebViewState extends State<MiSaludProWebView> {
   HttpServer? _localServer;
   bool _isLoading = true;
   String? _errorMessage;
+  bool _pageLoaded = false;
+  double _lastSafeTop = -1;
+  double _lastSafeBottom = -1;
+
+  void _injectSafeAreaInsets({bool force = false}) {
+    if (!mounted || !_pageLoaded) return;
+    final padding = MediaQuery.maybePaddingOf(context);
+    if (padding == null) return;
+    if (!force && padding.top == _lastSafeTop && padding.bottom == _lastSafeBottom) {
+      return;
+    }
+    _lastSafeTop = padding.top;
+    _lastSafeBottom = padding.bottom;
+    final topPx = padding.top.toStringAsFixed(1);
+    final bottomPx = padding.bottom.toStringAsFixed(1);
+    final isAndroid = Platform.isAndroid;
+    _controller.runJavaScript('''
+      (function() {
+        var root = document.documentElement;
+        root.style.setProperty('--native-safe-top', '${topPx}px');
+        root.style.setProperty('--native-safe-bottom', '${bottomPx}px');
+        if ($isAndroid) { root.classList.add('platform-android'); }
+      })();
+    ''');
+  }
 
   Future<void> _handleFlutterChannelMessage(String raw) async {
     if (raw == 'back') {
@@ -105,8 +130,9 @@ class _MiSaludProWebViewState extends State<MiSaludProWebView> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (_) {
+            _pageLoaded = true;
             if (mounted) setState(() => _isLoading = false);
-            // Inject safe-area-inset-top via meta viewport so CSS env() works
+            _injectSafeAreaInsets(force: true);
             // Also disable iOS back-swipe navigation inside the webview
             _controller.runJavaScript('''
               (function() {
@@ -212,6 +238,7 @@ class _MiSaludProWebViewState extends State<MiSaludProWebView> {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _injectSafeAreaInsets());
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
