@@ -242,31 +242,30 @@ export function RoutinesView({
       </div>
 
       {/* Apple Fitness GPS Outdoor Launcher Card */}
-      <div className="apple-glass-card rounded-[28px] p-4.5 space-y-3.5 border-l-4 border-l-[#74D834]">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-2xl bg-[#74D834]/15 border border-[#74D834]/30 flex items-center justify-center text-[#74D834] shrink-0">
-              <MapPin className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="font-display text-sm font-bold text-white truncate">
-                Carrera y Caminata GPS
-              </h2>
-              <p className="text-[11px] text-[#8E9D93] truncate">
-                Velocímetro y mapa satelital en vivo
-              </p>
-            </div>
+      <div className="rounded-[24px] bg-[#131A16] border border-white/8 p-4 overflow-hidden relative">
+        {/* Green glow top-left accent */}
+        <div className="absolute -top-6 -left-6 w-24 h-24 bg-[#74D834]/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="flex items-center gap-3 mb-4 relative">
+          <div className="w-11 h-11 rounded-2xl bg-[#74D834]/20 border border-[#74D834]/30 flex items-center justify-center text-[#74D834] shrink-0">
+            <MapPin className="w-5 h-5" />
           </div>
-          <span className="px-2.5 py-1 rounded-full bg-[#74D834]/15 text-[#74D834] text-[10px] font-extrabold uppercase tracking-wider shrink-0">
-            GPS Activo
+          <div className="min-w-0 flex-1">
+            <h2 className="font-display text-sm font-extrabold text-white">
+              Carrera y Caminata GPS
+            </h2>
+            <p className="text-[11px] text-[#8E9D93]">
+              Velocímetro y mapa satelital en vivo
+            </p>
+          </div>
+          <span className="px-2.5 py-1 rounded-full bg-[#74D834]/15 text-[#74D834] text-[9px] font-extrabold uppercase tracking-wider shrink-0">
+            GPS
           </span>
         </div>
-
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-2 gap-2.5 relative">
           <button
             type="button"
             onClick={() => setOutdoorActivity('Carrera al aire libre')}
-            className="min-h-[44px] px-3.5 rounded-2xl bg-[#74D834] text-[#081007] font-display font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer hover:bg-[#82E63E] apple-press shadow-md shadow-[#74D834]/20"
+            className="min-h-[48px] px-3.5 rounded-2xl bg-[#74D834] text-[#081007] font-display font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer hover:bg-[#82E63E] apple-press shadow-lg shadow-[#74D834]/25"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>Iniciar Carrera</span>
@@ -274,7 +273,7 @@ export function RoutinesView({
           <button
             type="button"
             onClick={() => setOutdoorActivity('Caminata al aire libre')}
-            className="min-h-[44px] px-3.5 rounded-2xl apple-glass-pill text-white font-display font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer hover:bg-white/10 apple-press border border-white/10"
+            className="min-h-[48px] px-3.5 rounded-2xl bg-white/6 border border-white/10 text-white font-display font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer hover:bg-white/10 apple-press"
           >
             <Footprints className="w-3.5 h-3.5 text-[#74D834]" />
             <span>Caminar</span>
@@ -284,48 +283,55 @@ export function RoutinesView({
 
       {/* Featured Apple Hero Routine Card */}
       {featured && (
-        <div className="apple-glass-card rounded-[28px] p-4 space-y-3.5">
-          <div className="relative rounded-2xl overflow-hidden shadow-lg shadow-black/50">
+        <div className="rounded-[28px] overflow-hidden relative bg-[#131A16] border border-white/8 shadow-xl shadow-black/40">
+          {/* Full-bleed thumbnail */}
+          <div className="relative">
             <RoutineThumbnailArtwork type={featured.thumbnailType} featured />
-            <div className="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-[10px] font-bold text-[#74D834] uppercase tracking-wider">
+            {/* Gradient overlay so text is readable */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0D0B]/95 via-[#0A0D0B]/30 to-transparent pointer-events-none" />
+            {/* Badges */}
+            <div className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-[#74D834] text-[#081007] text-[10px] font-extrabold uppercase tracking-wider">
               Destacado
             </div>
-          </div>
-
-          <div className="px-1 space-y-1">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="font-display text-lg font-bold text-white tracking-tight">
+            <button
+              type="button"
+              onClick={() => openRoutinePreview(featured)}
+              className="absolute top-3 right-3 px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-[10px] font-bold text-white inline-flex items-center gap-1 cursor-pointer hover:bg-black/80 apple-press"
+            >
+              <Sparkles className="w-3 h-3 text-[#74D834]" />
+              Ver 3D
+            </button>
+            {/* Content overlaid on gradient */}
+            <div className="absolute bottom-0 left-0 right-0 p-4">
+              <h2 className="font-display text-xl font-extrabold text-white tracking-tight leading-tight">
                 {featured.title}
               </h2>
-              <button
-                type="button"
-                onClick={() => openRoutinePreview(featured)}
-                className="text-xs text-[#74D834] hover:underline cursor-pointer shrink-0 inline-flex items-center gap-1"
-              >
-                <Sparkles className="w-3 h-3" />
-                <span>Ver 3D</span>
-              </button>
+              <p className="text-xs text-[#B0C0B6] mt-1 font-mono-nums flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {featured.durationMin} min
+                </span>
+                <span>·</span>
+                <span>{featured.level}</span>
+                <span>·</span>
+                <span className="text-[#FF9F0A] inline-flex items-center gap-0.5">
+                  <Flame className="w-3 h-3" />
+                  {featured.caloriesEstimate} kcal
+                </span>
+              </p>
             </div>
-            <p className="text-xs text-[#8E9D93] font-mono-nums flex items-center gap-1.5">
-              <span>{featured.durationMin} min</span>
-              <span>·</span>
-              <span>Nivel: {featured.level}</span>
-              <span>·</span>
-              <span className="text-[#FF9F0A] inline-flex items-center gap-0.5">
-                <Flame className="w-3 h-3" />
-                {featured.caloriesEstimate} kcal
-              </span>
-            </p>
           </div>
-
-          <button
-            type="button"
-            onClick={() => startRoutine(featured)}
-            className="w-full min-h-[48px] py-3 px-4 rounded-2xl font-display font-bold text-sm text-[#081007] bg-[#74D834] hover:bg-[#82E63E] apple-press flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#74D834]/25"
-          >
-            <Play className="w-4 h-4 fill-current" />
-            <span>Comenzar Entrenamiento</span>
-          </button>
+          {/* CTA below image */}
+          <div className="p-3">
+            <button
+              type="button"
+              onClick={() => startRoutine(featured)}
+              className="w-full min-h-[50px] rounded-2xl font-display font-bold text-sm text-[#081007] bg-[#74D834] hover:bg-[#82E63E] apple-press flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#74D834]/25"
+            >
+              <Play className="w-4 h-4 fill-current" />
+              <span>Comenzar entrenamiento</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -347,27 +353,43 @@ export function RoutinesView({
           secondaryList.map((routine) => (
             <div
               key={routine.id}
-              className="apple-glass-card rounded-2xl p-3 flex items-center justify-between gap-3 hover:border-white/15 transition-all group"
+              className="rounded-2xl bg-[#131A16] border border-white/8 overflow-hidden hover:border-white/15 transition-all group"
             >
               <button
                 type="button"
                 onClick={() => openRoutinePreview(routine)}
-                className="flex items-center gap-3 flex-1 text-left cursor-pointer min-w-0"
+                className="flex items-center gap-3 w-full text-left cursor-pointer p-3"
               >
-                <div className="rounded-xl overflow-hidden shrink-0 group-hover:scale-102 transition-transform">
+                {/* Thumbnail */}
+                <div className="rounded-xl overflow-hidden shrink-0 w-16 h-16 group-hover:scale-105 transition-transform">
                   <RoutineThumbnailArtwork type={routine.thumbnailType} />
                 </div>
+                {/* Info */}
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-display text-sm font-bold text-white truncate">
+                  <h3 className="font-display text-sm font-extrabold text-white leading-tight">
                     {routine.title}
                   </h3>
-                  <p className="text-xs text-[#8E9D93] mt-0.5 truncate font-mono-nums">
-                    {routine.durationMin} min · {routine.exercises.length} ejercicios · Guía 3D
+                  <p className="text-[11px] text-[#8E9D93] mt-0.5 font-mono-nums">
+                    {routine.durationMin} min · {routine.exercises.length} ej. · {routine.level}
                   </p>
+                  <span className="inline-flex items-center gap-1 mt-1 text-[11px] text-[#FF9F0A] font-semibold">
+                    <Flame className="w-3 h-3" />
+                    {routine.caloriesEstimate} kcal
+                  </span>
                 </div>
+                <ChevronRight className="w-4 h-4 text-[#4A5A50] shrink-0 group-hover:text-[#74D834] transition-colors" />
               </button>
 
-              <div className="flex items-center gap-1.5 shrink-0">
+              {/* Bottom action bar */}
+              <div className="flex items-center gap-2 px-3 pb-3">
+                <button
+                  type="button"
+                  onClick={() => startRoutine(routine)}
+                  className="flex-1 min-h-[36px] rounded-xl bg-[#74D834] text-[#081007] font-display font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer hover:bg-[#82E63E] apple-press"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Iniciar</span>
+                </button>
                 {activeTab === 'explore' && (
                   <button
                     type="button"
@@ -375,51 +397,50 @@ export function RoutinesView({
                     aria-label="Guardar en Mis Rutinas"
                     className={`w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer apple-press transition-colors ${
                       routine.inMyRoutines
-                        ? 'text-[#74D834] bg-[#74D834]/15'
-                        : 'text-[#8E9D93] hover:text-white'
+                        ? 'text-[#74D834] bg-[#74D834]/15 border border-[#74D834]/30'
+                        : 'text-[#8E9D93] bg-white/6 border border-white/8 hover:text-white'
                     }`}
                   >
                     <Bookmark className="w-4 h-4" />
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => startRoutine(routine)}
-                  aria-label={`Iniciar ${routine.title}`}
-                  className="w-9 h-9 rounded-xl bg-[#1B241E] hover:bg-[#74D834] hover:text-[#081007] text-[#C5D0C8] flex items-center justify-center apple-press transition-all cursor-pointer"
-                >
-                  <Play className="w-4 h-4 fill-current ml-0.5" />
-                </button>
               </div>
             </div>
           ))
         )}
       </div>
 
-      {/* Routine Preview Modal with Live 3D Animation for Every Exercise */}
+      {/* Routine Detail — Full-screen overlay, no nested scroll traps */}
       {selectedRoutine && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end justify-center p-2.5 sm:p-4 animate-in fade-in duration-200">
-          <div className="apple-glass-elevated w-full max-w-md rounded-[32px] p-5 space-y-4 max-h-[88vh] overflow-y-auto">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="font-display text-lg font-bold text-white">
-                  {selectedRoutine.title}
-                </h3>
-                <p className="text-xs text-[#8E9D93] mt-0.5">
-                  Nivel: {selectedRoutine.level} · {selectedRoutine.durationMin} min · Toca un ejercicio para verlo en 3D
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedRoutine(null)}
-                className="w-8 h-8 rounded-full bg-white/8 hover:bg-white/15 flex items-center justify-center text-[#9AA89E] hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+        <div className="fixed inset-0 z-50 bg-[#070A08] flex flex-col animate-in slide-in-from-bottom duration-300">
+          {/* Fixed header */}
+          <div className="flex items-center gap-3 px-4 pt-safe-top pt-5 pb-3 border-b border-white/8 shrink-0 bg-[#070A08]">
+            <button
+              type="button"
+              onClick={() => setSelectedRoutine(null)}
+              className="w-9 h-9 rounded-full bg-white/8 hover:bg-white/15 flex items-center justify-center text-[#9AA89E] hover:text-white cursor-pointer shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-display text-base font-extrabold text-white truncate">
+                {selectedRoutine.title}
+              </h2>
+              <p className="text-[11px] text-[#8E9D93] truncate">
+                {selectedRoutine.level} · {selectedRoutine.durationMin} min · {selectedRoutine.exercises.length} ejercicios
+              </p>
             </div>
+            <span className="px-2.5 py-1 rounded-full bg-[#FF9F0A]/15 text-[#FF9F0A] text-[10px] font-extrabold uppercase tracking-wide shrink-0 inline-flex items-center gap-1">
+              <Flame className="w-3 h-3" />
+              {selectedRoutine.caloriesEstimate} kcal
+            </span>
+          </div>
 
+          {/* Scrollable body */}
+          <div className="flex-1 overflow-y-auto">
+            {/* 3D Viewer */}
             {previewExercise && (
-              <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/40">
+              <div className="mx-4 mt-4 rounded-3xl overflow-hidden border border-white/10 bg-black/40">
                 <Exercise3DViewer
                   exerciseName={previewExercise.name}
                   animKind={inferExerciseAnimKind(
@@ -427,12 +448,24 @@ export function RoutinesView({
                     previewExercise.name,
                     previewExercise.animKind
                   )}
-                  heightClass="h-52"
+                  heightClass="h-56"
                 />
+                <div className="px-4 py-3 border-t border-white/8">
+                  <p className="font-display text-sm font-bold text-white">
+                    {previewExercise.name}
+                  </p>
+                  <p className="text-xs text-[#8E9D93] mt-0.5 leading-relaxed">
+                    {previewExercise.instructions}
+                  </p>
+                </div>
               </div>
             )}
 
-            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+            {/* Exercise List — no height limit, everything visible */}
+            <div className="px-4 mt-4 pb-4 space-y-2">
+              <p className="text-xs font-bold text-[#8E9D93] uppercase tracking-wider px-1 pb-1">
+                Ejercicios de la rutina
+              </p>
               {selectedRoutine.exercises.map((ex, idx) => {
                 const active = idx === previewExerciseIdx;
                 return (
@@ -440,35 +473,50 @@ export function RoutinesView({
                     key={ex.id}
                     type="button"
                     onClick={() => setPreviewExerciseIdx(idx)}
-                    className={`w-full text-left p-3 rounded-2xl border space-y-1 transition-all cursor-pointer apple-press ${
+                    className={`w-full text-left rounded-2xl border transition-all cursor-pointer apple-press ${
                       active
                         ? 'bg-[#74D834]/15 border-[#74D834]/60'
-                        : 'bg-white/3 border-white/6 hover:border-white/15'
+                        : 'bg-white/3 border-white/6 hover:border-white/12'
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-display text-xs font-semibold text-white">
-                        {idx + 1}. {ex.name}
-                      </span>
-                      <span className="text-[11px] text-[#74D834] font-mono-nums shrink-0">
-                        {ex.sets}
-                      </span>
+                    <div className="flex items-center gap-3 p-3">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 font-display text-xs font-extrabold ${
+                        active ? 'bg-[#74D834] text-[#081007]' : 'bg-white/8 text-[#8E9D93]'
+                      }`}>
+                        {idx + 1}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-display text-sm font-semibold text-white leading-tight">
+                          {ex.name}
+                        </p>
+                        <p className="text-[11px] text-[#74D834] font-mono-nums mt-0.5">
+                          {ex.sets}
+                        </p>
+                      </div>
+                      <ChevronRight className={`w-4 h-4 shrink-0 transition-colors ${active ? 'text-[#74D834]' : 'text-[#4A5A50]'}`} />
                     </div>
-                    <p className="text-[11px] text-[#8E9D93] leading-relaxed">
-                      {ex.instructions}
-                    </p>
+                    {active && (
+                      <div className="px-3 pb-3">
+                        <p className="text-xs text-[#B0C0B6] leading-relaxed bg-black/30 rounded-xl px-3 py-2">
+                          {ex.instructions}
+                        </p>
+                      </div>
+                    )}
                   </button>
                 );
               })}
             </div>
+          </div>
 
+          {/* Fixed bottom CTA — always visible */}
+          <div className="px-4 pb-safe-bottom pb-6 pt-3 border-t border-white/8 bg-[#070A08]/95 backdrop-blur-xl shrink-0">
             <button
               type="button"
               onClick={() => startRoutine(selectedRoutine)}
-              className="w-full min-h-[48px] rounded-2xl font-display font-bold text-sm text-[#081007] bg-[#74D834] hover:bg-[#82E63E] apple-press cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-[#74D834]/25"
+              className="w-full min-h-[52px] rounded-2xl font-display font-bold text-base text-[#081007] bg-[#74D834] hover:bg-[#82E63E] apple-press cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-[#74D834]/30"
             >
-              <Play className="w-4 h-4 fill-current" />
-              <span>Comenzar ahora</span>
+              <Play className="w-5 h-5 fill-current" />
+              <span>Comenzar entrenamiento</span>
             </button>
           </div>
         </div>
